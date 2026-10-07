@@ -10,7 +10,7 @@ async function main() {
   const config=desktopConfigSchema.parse(JSON.parse(fs.readFileSync(path.join(root,'data','desktop-projects.json'),'utf8')));
   process.env.JARVIS_ACCESS_KEY=fs.readFileSync(path.join(root,'data','jarvis-access-key.txt'),'utf8').trim();
   process.env.JARVIS_MODE='desktop'; process.env.NODE_ENV='development'; process.env.HOST='127.0.0.1';
-  process.env.ALLOWED_ORIGINS='http://127.0.0.1:3002,http://localhost:3002';
+  process.env.ALLOWED_ORIGINS='https://jarvis-eta-blue.vercel.app,http://127.0.0.1:3002,http://localhost:3002';
   const app=buildDesktopApp(config,root);
   await app.listen({host:'127.0.0.1',port:3002});
   console.log('Jarvis Desktop listo en http://127.0.0.1:3002 (solo lectura).');

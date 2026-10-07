@@ -6,6 +6,8 @@ import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { ReadOnlyProjects } from './projects';
 import { buildDesktopApp } from './app';
+import { BRIDGE_ORIGIN, createBridgeToken, validBridgeToken } from '../security/bridge';
+import { createSession, validSession } from '../security/auth';
 
 test('lectura: proyecto explícito, secretos, traversal, junctions, tamaño y Git fijo', async() => {
   const temp=await fs.mkdtemp(path.join(os.tmpdir(),'jarvis-desktop-'));
@@ -36,7 +38,7 @@ test('lectura: proyecto explícito, secretos, traversal, junctions, tamaño y Gi
 
 test('API local: sesión obligatoria, origen/host, sin comandos ni escritura', async()=>{
   const original={key:process.env.JARVIS_ACCESS_KEY,origins:process.env.ALLOWED_ORIGINS,mode:process.env.JARVIS_MODE};
-  process.env.JARVIS_ACCESS_KEY='test-only-key-'.repeat(4);process.env.ALLOWED_ORIGINS='http://127.0.0.1:3002';process.env.JARVIS_MODE='desktop';
+  process.env.JARVIS_ACCESS_KEY='test-only-key-'.repeat(4);process.env.ALLOWED_ORIGINS='http://127.0.0.1:3002,'+BRIDGE_ORIGIN;process.env.JARVIS_MODE='desktop';
   const app=buildDesktopApp({projects:[{id:'test',name:'Test',root:process.cwd()}]},path.resolve('nonexistent-test-voice-root'));
   const headers={host:'127.0.0.1:3002'};
   try {
@@ -49,5 +51,22 @@ test('API local: sesión obligatoria, origen/host, sin comandos ni escritura', a
     assert.equal((await app.inject({method:'POST',url:'/api/execute_command',headers:auth,payload:{command:'whoami'}})).statusCode,404);
     assert.equal((await app.inject({url:'/api/desktop/read?project=test&path=../private.md',headers:auth})).statusCode,400);
     assert.equal((await app.inject({method:'POST',url:'/api/voice/synthesize',headers:auth,payload:{text:'x'.repeat(221)}})).statusCode,400);
+    const bridge={...headers,origin:BRIDGE_ORIGIN,authorization:'Bearer '+createBridgeToken(process.env.JARVIS_ACCESS_KEY!)};
+    const status=await app.inject({url:'/api/bridge/desktop/status',headers:bridge});
+    assert.equal(status.statusCode,200);assert.equal(status.headers['access-control-allow-origin'],BRIDGE_ORIGIN);
+    assert.equal((await app.inject({url:'/api/bridge/desktop/status',headers:{...bridge,origin:'https://evil.example'}})).statusCode,403);
+    assert.equal((await app.inject({url:'/api/bridge/desktop/status',headers:auth})).statusCode,401,'Cookie local no sustituye la autorización del puente');
+    assert.equal((await app.inject({method:'POST',url:'/api/bridge/chat',headers:bridge,payload:{message:'hello'}})).statusCode,401,'El token solo permite lectura y voz');
+    assert.equal((await app.inject({method:'OPTIONS',url:'/api/bridge/desktop/status',headers:{...headers,origin:BRIDGE_ORIGIN,'access-control-request-method':'GET','access-control-request-headers':'authorization'}})).statusCode,204);
   } finally {await app.close();for(const [key,value] of Object.entries({JARVIS_ACCESS_KEY:original.key,ALLOWED_ORIGINS:original.origins,JARVIS_MODE:original.mode})) {if(value===undefined)delete process.env[key];else process.env[key]=value;}}
+});
+
+test('credencial de puente: firma, propósito y vencimiento separados de la sesión',()=>{
+  const key='test-only-key-'.repeat(4),now=Date.now();const token=createBridgeToken(key,now);
+  assert(validBridgeToken(token,key,now));
+  assert(!validBridgeToken(token,key,now+600000));
+  assert(!validBridgeToken(token,'different-key',now));
+  assert(!validBridgeToken(token.slice(0,-1)+'X',key,now));
+  assert(!validBridgeToken(createSession(key,now),key,now));
+  assert(!validSession(token,key,now));
 });

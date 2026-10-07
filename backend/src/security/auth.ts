@@ -1,5 +1,5 @@
 import { createHmac, timingSafeEqual, randomBytes } from 'crypto';
-import { FastifyInstance } from 'fastify';
+import { FastifyInstance, FastifyRequest } from 'fastify';
 
 const COOKIE = 'jarvis_session';
 const SESSION_SECONDS = 8 * 60 * 60;
@@ -39,7 +39,7 @@ export function validSession(token: string, key: string, now = Date.now()): bool
   return equal(parts[2], createHmac('sha256', key).update(`${parts[0]}.${parts[1]}`).digest('hex'));
 }
 
-export function registerAuth(app: FastifyInstance, options: { allowLogin?: (ipHash: string) => Promise<boolean> } = {}): void {
+export function registerAuth(app: FastifyInstance, options: { allowLogin?: (ipHash: string) => Promise<boolean>; bridgeAuthorized?: (request:FastifyRequest)=>boolean } = {}): void {
   validateAccessConfig();
   const key = process.env.JARVIS_ACCESS_KEY;
   const origins = allowedOrigins();
@@ -61,6 +61,10 @@ export function registerAuth(app: FastifyInstance, options: { allowLogin?: (ipHa
       return reply.code(403).send({ message: 'Origen no permitido.' });
     }
     if (url === '/api/health' || url === '/api/session' || request.method === 'OPTIONS') return;
+    if (url.startsWith('/api/bridge/')) {
+      if (options.bridgeAuthorized?.(request)) return;
+      return reply.code(401).send({message:'Conexión con el equipo no autorizada.'});
+    }
     if (!authenticated(request.headers.cookie)) return reply.code(401).send({ message: 'Iniciá sesión para acceder a Jarvis.' });
   });
 

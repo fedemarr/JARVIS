@@ -14,11 +14,11 @@ La conexión entre computadoras sigue pendiente. Ver [DEPLOYMENT.md](DEPLOYMENT.
 
 ### Jarvis Desktop y voz natural
 
-Primera versión local en **http://127.0.0.1:3002**: lectura de proyectos autorizados,
-estado de Git y archivos de texto que se pueden revisar y enviar al chat de Claude.
+Entrada única: **https://jarvis-eta-blue.vercel.app**. La misma pantalla reúne
+chat, internet, proyectos autorizados, Git y archivos que se pueden revisar y enviar a Claude.
 Voz masculina en español Alex con Kokoro en CPU, sin API de voz paga, y respaldo
-del navegador. Iniciar con `npm run desktop` después de compilar y configurar
-las carpetas privadas. Ver [Desktop Agent](desktop-agent/README.md) y
+del navegador. El conector de la PC funciona en segundo plano; se puede iniciar
+con Windows mediante `desktop-agent/install-startup.ps1`. Ver [Desktop Agent](desktop-agent/README.md) y
 [instalación de voz](voice-local/README.md).
 
 El acceso a la PC desde el celular, la escritura y la ejecución de trabajos

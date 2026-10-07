@@ -30,6 +30,10 @@ Actualizar Vite/Tailwind y sus dependencias de desarrollo en una iteración apar
 Nuevo avance local: agente dedicado en `127.0.0.1:3002`, con sesión privada,
 proyectos explícitos, lectura protegida de texto y Git con argumentos fijos.
 La interfaz permite revisar contexto antes de enviarlo a Claude por HTTPS.
+La web publicada integra esos proyectos y la voz local mediante un puente autenticado
+con permisos acotados y credenciales temporales. El conector puede iniciar con Windows
+en segundo plano; no hace falta abrir una interfaz Desktop aparte. Se corrigió la
+activación de manos libres durante respuestas para que espere sin cortar la lectura.
 Kokoro ONNX con voz Alex en español corre en CPU; se comprobó generación de WAV
 y reproducción desde la J. Se verificaron Git de OhlimpiaERP, bloqueo de secretos
 y respuesta real por el proxy. No hay todavía vinculación remota del celular,

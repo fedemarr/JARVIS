@@ -17,7 +17,7 @@ npm run desktop
 
 Descargas iniciales: modelo aproximado de 326 MB, voces y dependencias de Python. Todos permanecen en `data/`, excluida de Git y de Vercel. Después de la descarga, sintetizar voz no necesita internet. El chat con Claude sí lo necesita. El modelo tarda en cargarse al iniciar; la interfaz indica su disponibilidad.
 
-En http://127.0.0.1:3002, hacer clic en la J permite probar el saludo. El selector ofrece Alex y las voces instaladas del navegador. En Vercel y en el celular se mantiene la voz del navegador: el audio local no se retransmite por internet en esta etapa.
+En https://jarvis-eta-blue.vercel.app, hacer clic en la J permite probar el saludo. Si el conector está encendido en esa misma PC y el navegador permite la conexión local, la voz Alex se reproduce en la web mediante el puente autenticado. El selector ofrece Alex y las voces del navegador. En el celular o con el equipo desconectado se mantiene la voz del navegador; todavía no se retransmite el audio de la PC a otros dispositivos por internet.
 
 SHA-256 de las descargas verificadas:
 

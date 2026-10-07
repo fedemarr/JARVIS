@@ -100,6 +100,8 @@ async function run() {
     await textarea.press('Enter');
     await page.getByText(replyParts.join(''), { exact: true }).waitFor();
     await page.waitForFunction(() => window.spoken.length === 3);
+    await page.getByRole('button',{name:'Activar manos libres'}).click();
+    assert.equal(await page.evaluate(()=>window.recognitionStarts),0,'Activar manos libres durante la lectura debe esperar sin cancelar la respuesta');
     for (let i = 0; i < replyParts.length; i++) {
       assert.equal((await page.evaluate(index => window.spoken[index + 2], i)).trim(), replyParts[i].trim());
       assert(await page.locator('.reactor-speaking').isVisible(), 'Animación durante toda la lectura');
@@ -107,6 +109,8 @@ async function run() {
       if (i < replyParts.length - 1) await page.waitForFunction(count => window.spoken.length === count, i + 4);
     }
     await page.locator('.reactor-idle').waitFor();
+    await page.getByRole('button',{name:'Desactivar manos libres'}).click();
+    assert.equal(await page.evaluate(()=>window.recognitionStarts),0,'No abrir el micrófono mientras está hablando');
     assert.equal(await page.evaluate(() => window.spoken.slice(2).join('')), replyParts.join(''), 'Leer toda la respuesta en orden');
     assert.match(submitted.message, /Corregir validación/);
     await upload.setInputFiles({ name: 'grande.md', mimeType: 'text/markdown', buffer: Buffer.alloc(66000, 'x') });
@@ -138,9 +142,9 @@ async function run() {
     }
     await page.waitForFunction(() => window.recognitionStarts === 4);
     await page.evaluate(() => window.say('dormí'));
-    await page.getByText('Decí «Jarvis» para llamarme', { exact: true }).waitFor();
     await page.waitForFunction(() => window.spoken.length === 10);
     await page.evaluate(() => window.lastUtterance.onend());
+    await page.getByText('Decí «Jarvis» para llamarme', { exact: true }).waitFor();
     await page.waitForFunction(() => window.recognitionStarts === 5);
     await page.evaluate(() => window.say('Jarvis organiza mi día'));
     await page.waitForFunction(() => window.spoken.length === 11);

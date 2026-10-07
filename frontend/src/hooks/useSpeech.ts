@@ -21,10 +21,12 @@ export function useSpeech({ stt, tts, onCommand }: UseSpeechOptions) {
 
   useEffect(() => {
     const refreshVoices = () => setVoices(tts.listVoices());
+    window.addEventListener('jarvis-desktop-changed',refreshVoices);
     if (tts.supported && typeof speechSynthesis !== 'undefined') {
       speechSynthesis.addEventListener('voiceschanged', refreshVoices);
-      return () => speechSynthesis.removeEventListener('voiceschanged', refreshVoices);
+      return () => {speechSynthesis.removeEventListener('voiceschanged', refreshVoices);window.removeEventListener('jarvis-desktop-changed',refreshVoices);};
     }
+    return () => window.removeEventListener('jarvis-desktop-changed',refreshVoices);
   }, [tts]);
 
   useEffect(() => {
@@ -35,11 +37,11 @@ export function useSpeech({ stt, tts, onCommand }: UseSpeechOptions) {
     });
     stt.onEnd((reason) => {
       listeningRef.current = false;
-      if (reason === 'no-speech' || reason === 'aborted') {
-        setOrbState('IDLE');
+      if (reason === 'no-speech' || reason === 'aborted' || reason === 'stopped') {
+        setOrbState((state) => state === 'LISTENING' ? 'IDLE' : state);
       } else if (reason === 'error') {
         setOrbState('ERROR');
-        setTimeout(() => setOrbState('IDLE'), 1500);
+        setTimeout(() => setOrbState((state) => state === 'ERROR' ? 'IDLE' : state), 1500);
       }
     });
     tts.onEnd(() => {
@@ -80,10 +82,11 @@ export function useSpeech({ stt, tts, onCommand }: UseSpeechOptions) {
       if (!text || !tts.supported) return;
       if (force) { tts.setMuted(false); setIsMuted(false); }
       if (tts.isMuted()) return;
+      if (listeningRef.current) {listeningRef.current = false;stt.abort();setPartialTranscript('');}
       setOrbState('SPEAKING');
       tts.speak(text);
     },
-    [tts],
+    [tts, stt],
   );
 
   const cancelSpeaking = useCallback(() => {
@@ -113,7 +116,7 @@ export function useSpeech({ stt, tts, onCommand }: UseSpeechOptions) {
 
   const setError = useCallback(() => {
     setOrbState('ERROR');
-    setTimeout(() => setOrbState('IDLE'), 1500);
+    setTimeout(() => setOrbState((state) => state === 'ERROR' ? 'IDLE' : state), 1500);
   }, []);
 
   return {

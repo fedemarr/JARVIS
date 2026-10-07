@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react';
-import { apiFetch } from '../lib/api';
+import { desktopFetch, refreshDesktop } from '../lib/desktop';
 
 type Project = {id:string;name:string};
 type FileEntry = {name:string;path:string;directory:boolean};
 export function DesktopPanel({onImport,disabled}:{onImport:(text:string)=>void;disabled:boolean}) {
-  const local=['localhost','127.0.0.1'].includes(window.location.hostname) && window.location.port==='3002';
+  const [connected,setConnected]=useState(false);
+  const [attempt,setAttempt]=useState(0);
   const [projects,setProjects]=useState<Project[]>([]);
   const [project,setProject]=useState('');
   const [directory,setDirectory]=useState('.');
@@ -14,27 +15,27 @@ export function DesktopPanel({onImport,disabled}:{onImport:(text:string)=>void;d
   const [natural,setNatural]=useState(false);
   const [voiceStarting,setVoiceStarting]=useState(false);
   useEffect(()=>{
-    if (!local) return;
     let active=true;
+    let online=false;
     const refresh=async()=>{
-      try {const response=await apiFetch('/api/desktop/status');if(!response.ok)return;const data=await response.json();if(active){setProjects(data.projects);setProject((prev)=>prev || data.projects[0]?.id || '');setNatural(data.voice.available);setVoiceStarting(data.voice.state==='starting');}}
-      catch {if(active)setNotice('El agente local no está disponible.');}
+      try {const data=await refreshDesktop();online=true;if(active){setConnected(true);setProjects(data.projects);setProject((prev)=>prev || data.projects[0]?.id || '');setNatural(data.voice.available);setVoiceStarting(data.voice.state==='starting');}}
+      catch {online=false;if(active){setConnected(false);setProjects([]);}}
     };
-    void refresh();const timer=setInterval(()=>void refresh(),15000);
+    void refresh();const timer=setInterval(()=>{if(active && online && document.visibilityState==='visible')void refresh();},15000);
     return()=>{active=false;clearInterval(timer);};
-  },[local]);
+  },[attempt]);
   useEffect(()=>{
-    if (!project) return;
+    if (!project || !connected) return;
     let active=true;
-    void apiFetch('/api/desktop/files?'+new URLSearchParams({project,path:directory})).then(async(response)=>{
+    void desktopFetch('/api/desktop/files?'+new URLSearchParams({project,path:directory}),{signal:AbortSignal.timeout(8000)}).then(async(response)=>{
       const data=await response.json();if(!response.ok)throw new Error(data.message);if(active){setFiles(data);setNotice('');}
     }).catch(()=>{if(active){setFiles([]);setNotice('No pude listar esa carpeta.');}});
     return()=>{active=false;};
-  },[project,directory]);
+  },[project,directory,connected]);
   async function importContext(kind:'git'|'read',path?:string) {
     setBusy(true);setNotice('');
     try {
-      const response=await apiFetch('/api/desktop/'+kind+'?'+new URLSearchParams({project,path:path || '.'}));
+      const response=await desktopFetch('/api/desktop/'+kind+'?'+new URLSearchParams({project,path:path || '.'}),{signal:AbortSignal.timeout(15000)});
       const data=await response.json();if(!response.ok)throw new Error(data.message);
       const content=kind==='read'?data.text:JSON.stringify(data,null,2);
       if(content.length>35000)throw new Error('El archivo es demasiado largo para el chat. Elegí uno más pequeño.');
@@ -44,7 +45,7 @@ export function DesktopPanel({onImport,disabled}:{onImport:(text:string)=>void;d
     finally {setBusy(false);}
   }
   return <section className="desktop-panel"><span className="eyebrow">ESTA COMPUTADORA</span>
-    {!local?<p>Para leer OhlimpiaERP y usar la voz local, abrí <a href="http://127.0.0.1:3002" target="_blank" rel="noreferrer">Jarvis Desktop en esta PC ↗</a>. El agente debe estar encendido.</p>:<>
+    {!connected?<><p>Chat e internet disponibles. Conectá esta PC para sumar tus proyectos y la voz Alex en esta misma pantalla.</p><button type="button" onClick={()=>setAttempt((value)=>value+1)}>Conectar esta PC</button><p>El agente debe estar encendido. Si el navegador lo pide, permití el acceso a la red local.</p></>:<>
       <p>{natural?'Voz natural lista · Alex':voiceStarting?'Preparando voz natural · respaldo del navegador activo':'Voz del navegador activa · motor local no disponible'} · Solo lectura</p>
       <div className="desktop-controls"><select aria-label="Proyecto local" value={project} onChange={(event)=>{setProject(event.target.value);setDirectory('.');}}>{projects.map((p)=><option key={p.id} value={p.id}>{p.name}</option>)}</select><button type="button" disabled={disabled || busy || !project} onClick={()=>void importContext('git')}>Estado de Git → chat</button></div>
       <div className="desktop-folder"><span>{directory==='.'?'Carpeta principal':directory}</span>{directory!=='.' && <button type="button" onClick={()=>setDirectory(directory.split('/').slice(0,-1).join('/') || '.')}>↑ Volver</button>}</div>

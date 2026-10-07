@@ -52,6 +52,7 @@ export function AccessGate({ children }: { children: ReactNode }) {
     try {
       const response = await fetch('/api/session', { method: 'DELETE', credentials: 'same-origin' });
       if (!response.ok) throw new Error('No se pudo cerrar la sesión.');
+      window.dispatchEvent(new Event('jarvis-logout'));
       setState('locked');
       setError('');
     } catch { window.alert('No se pudo cerrar la sesión. Volvé a intentarlo.'); }

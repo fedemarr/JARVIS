@@ -1,4 +1,5 @@
 import { SttProvider, TtsProvider, SttEndReason, TtsVoice } from '../../../shared/voice';
+import { desktopFetch, desktopConnected, naturalVoiceAvailable } from './desktop';
 
 const RecognitionCtor: SpeechRecognitionConstructor | undefined =
   typeof webkitSpeechRecognition !== 'undefined'
@@ -45,6 +46,7 @@ class BrowserStt implements SttProvider {
 
     recognition.onerror = (event: SpeechRecognitionErrorEvent) => {
       if (this.recognition !== recognition) return;
+      this.cleanup();
       if (event.error === 'no-speech') {
         this.onEndCb('no-speech');
       } else if (event.error === 'aborted') {
@@ -52,19 +54,16 @@ class BrowserStt implements SttProvider {
       } else {
         this.onEndCb('error');
       }
-      this.cleanup();
     };
 
     recognition.onend = () => {
       if (this.recognition !== recognition) return;
-      const hasFinal = this.finalTranscript.length > 0;
-      if (hasFinal) {
-        this.onFinalCb(this.finalTranscript);
-        this.onEndCb('stopped');
-      } else {
-        this.onEndCb('aborted');
-      }
+      const transcript = this.finalTranscript;
       this.cleanup();
+      this.finalTranscript = '';
+      // Cerrar el micrófono antes de que el comando comience a responder.
+      this.onEndCb(transcript ? 'stopped' : 'aborted');
+      if (transcript) this.onFinalCb(transcript);
     };
 
     this.recognition = recognition;
@@ -107,6 +106,11 @@ class BrowserStt implements SttProvider {
   }
 
   private cleanup(): void {
+    if (this.recognition) {
+      this.recognition.onresult = null;
+      this.recognition.onerror = null;
+      this.recognition.onend = null;
+    }
     this.recognition = null;
   }
 }
@@ -121,7 +125,6 @@ class BrowserTts implements TtsProvider {
   private queue: string[] = [];
   private currentUtterance: SpeechSynthesisUtterance | null = null;
   private localSpeech: { controller: AbortController; audio: HTMLAudioElement | null; url: string | null } | null = null;
-  private readonly localDesktop = ['localhost','127.0.0.1'].includes(window.location.hostname) && window.location.port === '3002';
 
   speak(text: string): void {
     if (!this.supported || this.muted || !text.trim()) return;
@@ -141,7 +144,7 @@ class BrowserTts implements TtsProvider {
     const text = this.queue.shift();
     if (!text) return;
     const generation = this.generation;
-    if (this.localDesktop && (this.selectedVoiceURI === null || this.selectedVoiceURI === 'kokoro:em_alex')) {
+    if (naturalVoiceAvailable() && (this.selectedVoiceURI === null || this.selectedVoiceURI === 'kokoro:em_alex' || this.selectedVoiceURI === '')) {
       void this.speakLocal(text, generation);
       return;
     }
@@ -151,31 +154,39 @@ class BrowserTts implements TtsProvider {
   private async speakLocal(text: string, generation: number): Promise<void> {
     const local = { controller:new AbortController(), audio:null as HTMLAudioElement | null, url:null as string | null };
     this.localSpeech = local;
+    let finished = false;
     const timer = setTimeout(() => local.controller.abort(), 50000);
     const cleanup = () => {
       clearTimeout(timer);
       if (local.url) { URL.revokeObjectURL(local.url); local.url = null; }
       if (this.localSpeech === local) this.localSpeech = null;
     };
+    const fallback = () => {
+      if (finished) return;
+      finished = true;
+      cleanup();
+      if (generation === this.generation && !this.muted) this.speakBrowser(text,generation);
+    };
     try {
-      const response = await fetch('/api/voice/synthesize', {method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json'},body:JSON.stringify({text}),signal:local.controller.signal});
+      const response = await desktopFetch('/api/voice/synthesize', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text}),signal:local.controller.signal});
       if (!response.ok) throw new Error('Voz local no disponible');
       const blob = await response.blob();
       if (generation !== this.generation) {cleanup();return;}
       local.url = URL.createObjectURL(blob);
       const audio = new Audio(local.url); local.audio = audio;
       const finish = () => {
+        if (finished) return;
+        finished = true;
         cleanup();
         if (generation !== this.generation) return;
         if (this.queue.length) this.speakNext(); else this.onEndCb();
       };
       audio.onended = finish;
-      audio.onerror = () => {cleanup();if (generation === this.generation) this.speakBrowser(text,generation);};
+      audio.onerror = fallback;
       clearTimeout(timer);
       await audio.play();
     } catch {
-      cleanup();
-      if (generation === this.generation && !this.muted) this.speakBrowser(text,generation);
+      fallback();
     }
   }
 
@@ -236,7 +247,7 @@ class BrowserTts implements TtsProvider {
       lang: v.lang,
       default: v.default,
     }));
-    if (this.localDesktop) listed.unshift({voiceURI:'kokoro:em_alex',name:'Alex · voz natural en esta PC',lang:'es'});
+    if (desktopConnected()) listed.unshift({voiceURI:'kokoro:em_alex',name:'Alex · voz natural en esta PC',lang:'es'});
     return listed;
   }
 

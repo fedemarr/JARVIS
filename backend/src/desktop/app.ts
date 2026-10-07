@@ -1,11 +1,13 @@
 import Fastify from 'fastify';
 import fastifyStatic from '@fastify/static';
+import cors from '@fastify/cors';
 import { Readable } from 'node:stream';
 import path from 'node:path';
 import { z } from 'zod';
 import { registerAuth } from '../security/auth';
 import { ReadOnlyProjects, DesktopConfig } from './projects';
 import { LocalVoice } from './voice';
+import { BRIDGE_ORIGIN, validBridgeToken } from '../security/bridge';
 
 const query = z.object({project:z.string().min(1).max(40),path:z.string().max(500).default('.')}).strict();
 export function buildDesktopApp(config:DesktopConfig,root:string,cloud='https://jarvis-eta-blue.vercel.app') {
@@ -15,7 +17,12 @@ export function buildDesktopApp(config:DesktopConfig,root:string,cloud='https://
   const projects = new ReadOnlyProjects(config);
   const voice = new LocalVoice(root);
   let cloudSession:Promise<string>|undefined;
-  registerAuth(app);
+  registerAuth(app,{bridgeAuthorized:(request)=>{
+    const url=request.url.split('?')[0];
+    const allowed=request.method==='GET'?/^\/api\/bridge\/(?:desktop\/(?:status|files|read|git)|voice\/status)$/:request.method==='POST' && url==='/api/bridge/voice/synthesize';
+    return !!allowed && request.headers.origin===BRIDGE_ORIGIN && validBridgeToken((request.headers.authorization || '').replace(/^Bearer /,''),process.env.JARVIS_ACCESS_KEY!);
+  }});
+  app.register(cors,{origin:[BRIDGE_ORIGIN,'http://127.0.0.1:3002','http://localhost:3002'],methods:['GET','POST','OPTIONS'],allowedHeaders:['Authorization','Content-Type']});
   app.addHook('onRequest',async(request,reply) => {
     // Evitar DNS rebinding: ningún dominio remoto puede apuntar a este servicio local.
     if (!/^(?:127\.0\.0\.1|localhost)(?::\d+)?$/.test(request.headers.host || '')) return reply.code(403).send({message:'Host no permitido.'});
@@ -30,6 +37,16 @@ export function buildDesktopApp(config:DesktopConfig,root:string,cloud='https://
   app.post('/api/voice/synthesize',async(request,reply) => {
     const {text} = z.object({text:z.string().trim().min(1).max(220)}).strict().parse(request.body);
     if (!voice.status().available || voice.status().busy) return reply.code(503).send({message:'Voz local no disponible; usá la voz del navegador.'});
+    return reply.type('audio/wav').send(await voice.synthesize(text));
+  });
+  app.get('/api/bridge/desktop/status',async()=>({mode:'read-only',local:true,projects:projects.list(),voice:voice.status()}));
+  app.get('/api/bridge/desktop/files',async(request)=>{const args=query.parse(request.query);return projects.files(args.project,args.path);});
+  app.get('/api/bridge/desktop/read',async(request)=>{const args=query.parse(request.query);return projects.read(args.project,args.path);});
+  app.get('/api/bridge/desktop/git',async(request)=>{const args=query.parse(request.query);return projects.git(args.project);});
+  app.get('/api/bridge/voice/status',async()=>voice.status());
+  app.post('/api/bridge/voice/synthesize',async(request,reply)=>{
+    const {text}=z.object({text:z.string().trim().min(1).max(220)}).strict().parse(request.body);
+    if(!voice.status().available || voice.status().busy)return reply.code(503).send({message:'Voz ocupada o no disponible.'});
     return reply.type('audio/wav').send(await voice.synthesize(text));
   });
   async function session() {

@@ -35,6 +35,7 @@ function App() {
     addSystemMessage,
   } = useChat();
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const commandBusyRef = useRef(false);
 
   const voice = useMemo(() => createBrowserVoice(), []);
 
@@ -105,6 +106,9 @@ function App() {
 
   const commandRef = useRef<(text: string) => Promise<void>>(async () => {});
   commandRef.current = async (text: string) => {
+    if (commandBusyRef.current) return;
+    commandBusyRef.current = true;
+    try {
     setInput('');
     setCoreGreeting('');
     speech.abortListening();
@@ -117,6 +121,7 @@ function App() {
     } else {
       speech.setOrbState('IDLE');
     }
+    } finally { commandBusyRef.current = false; }
   };
 
   useEffect(() => {
@@ -126,7 +131,7 @@ function App() {
   }, [messages]);
 
   useEffect(() => {
-    if (!handsFree || isLoading) return;
+    if (!handsFree || isLoading || commandBusyRef.current) return;
     if (speech.orbState === 'ERROR') {
       setHandsFree(false);
       setVoiceAwake(false);
@@ -134,7 +139,7 @@ function App() {
       return;
     }
     if (speech.orbState !== 'IDLE') return;
-    const timer = setTimeout(speech.startListening, 350);
+    const timer = setTimeout(speech.startListening, 700);
     return () => clearTimeout(timer);
   }, [handsFree, isLoading, speech.orbState, speech.startListening]);
 
@@ -180,7 +185,9 @@ function App() {
   const handleSendText = async (e: React.FormEvent) => {
     e.preventDefault();
     const text = input.trim();
-    if (!text || isLoading) return;
+    if (!text || isLoading || commandBusyRef.current) return;
+    commandBusyRef.current = true;
+    try {
     setInput('');
     setCoreGreeting('');
     speech.abortListening();
@@ -193,6 +200,7 @@ function App() {
     } else {
       speech.setOrbState('IDLE');
     }
+    } finally {commandBusyRef.current = false;}
   };
 
   const handleNewConversation = () => {
@@ -282,17 +290,21 @@ function App() {
             <button type="submit" disabled={isLoading || !input.trim()} className="send-button" aria-label="Enviar mensaje">↗</button>
           </form>
           <div className="handsfree-controls">
-            <button type="button" className={handsFree ? 'handsfree-toggle handsfree-active' : 'handsfree-toggle'} aria-pressed={handsFree} disabled={!speech.sttSupported || !speech.ttsSupported || (!handsFree && isLoading)} onClick={() => {
+            <button type="button" className={handsFree ? 'handsfree-toggle handsfree-active' : 'handsfree-toggle'} aria-pressed={handsFree} disabled={!speech.sttSupported || !speech.ttsSupported} onClick={() => {
               setVoiceNotice('');
               setVoiceAwake(false);
               if (handsFree) { setHandsFree(false); speech.abortListening(); }
-              else { setHandsFree(true); speech.startListening(); }
+              else {
+                setHandsFree(true);
+                // Activar durante una respuesta debe esperar, no cancelar la voz.
+                if (!isLoading && !commandBusyRef.current && speech.orbState === 'IDLE') speech.startListening();
+              }
             }}>{handsFree ? 'Desactivar manos libres' : 'Activar manos libres'}</button>
-            <span role="status">{handsFree ? voiceAwake ? 'Conversación activa · te escucho al terminar de hablar' : 'Decí «Jarvis» para llamarme' : !speech.sttSupported ? 'Reconocimiento de voz no disponible en este navegador' : 'Activá el micrófono una vez y después decí «Jarvis»'}</span>
+            <span role="status">{handsFree ? isLoading || speech.orbState === 'SPEAKING' ? 'Manos libres activo · te escucho cuando termine la respuesta' : voiceAwake ? 'Conversación activa · te escucho al terminar de hablar' : 'Decí «Jarvis» para llamarme' : !speech.sttSupported ? 'Reconocimiento de voz no disponible en este navegador' : 'Activá el micrófono una vez y después decí «Jarvis»'}</span>
           </div>
           {voiceNotice && <p className="voice-notice" role="alert">{voiceNotice}</p>}
           <div className="composer-footer"><span>ENTER para enviar · SHIFT + ENTER para nueva línea</span>
-            {speech.ttsSupported && speech.voices.length > 0 && <select aria-label="Voz de Jarvis" value={speech.selectedVoice ?? ''} onChange={(e) => speech.changeVoice(e.target.value)}><option value="">Voz automática · es-AR</option>{speech.voices.map((v) => <option key={v.voiceURI} value={v.voiceURI}>{v.name} ({v.lang})</option>)}</select>}
+            {speech.ttsSupported && speech.voices.length > 0 && <select aria-label="Voz de Jarvis" value={speech.selectedVoice ?? ''} onChange={(e) => speech.changeVoice(e.target.value)}><option value="">Voz automática</option>{speech.voices.map((v) => <option key={v.voiceURI} value={v.voiceURI}>{v.name} ({v.lang})</option>)}</select>}
           </div>
         </div>
         </div>

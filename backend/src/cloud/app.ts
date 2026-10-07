@@ -1,6 +1,7 @@
 import Fastify, { FastifyError } from 'fastify';
 import { randomUUID } from 'crypto';
 import { registerAuth } from '../security/auth';
+import { createBridgeToken } from '../security/bridge';
 import { getLlmProvider } from '../llm';
 import { runAgentTurn } from '../agent/loop';
 import { CloudStore } from './store';
@@ -27,6 +28,7 @@ export function buildCloudApp(store = new CloudStore(), provider?: LlmProvider) 
     return reply.code(503).send({ message: 'Jarvis no pudo completar la operación. Volvé a intentarlo.' });
   });
   app.get('/api/health', async () => ({ status: 'ok', provider: process.env.LLM_PROVIDER, model: process.env.AI_MODEL, mode: 'cloud' }));
+  app.post('/api/desktop/bridge-session',async()=>({token:createBridgeToken(process.env.JARVIS_ACCESS_KEY!),expiresIn:600}));
   app.get('/api/conversations', async () => store.conversations());
   app.get<{ Params: { id: string } }>('/api/conversations/:id', { schema: { params: { type: 'object', required: ['id'], properties: { id: { type: 'string', format: 'uuid' } } } } }, async (request, reply) => {
     const conversation = await store.conversation(request.params.id);

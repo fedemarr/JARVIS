@@ -28,7 +28,7 @@ export function cloudTools(store: CloudStore): ToolRegistry {
       const selected = tools.find((t) => t.name === name);
       if (!selected) return { ok: false, content: 'Herramienta no disponible en la nube.' };
       const parsed = safeParseArgs(selected.schema, args);
-      if (!parsed.ok) return { ok: false, content: parsed.error };
+      if (parsed.ok === false) return { ok: false, content: parsed.error };
       try { return { ok: true, content: await selected.handler(parsed.data) }; }
       catch { return { ok: false, content: 'No se pudo completar la operación. Volvé a intentarlo.' }; }
     },

@@ -15,6 +15,7 @@ import { LlmMessage } from '../../shared/llm';
 function App() {
   const access = useAccess();
   const [input, setInput] = useState('');
+  const [coreGreeting, setCoreGreeting] = useState('');
   const [backendStatus, setBackendStatus] = useState<'checking' | 'connected' | 'offline'>('checking');
   const [providerModel, setProviderModel] = useState('');
   const {
@@ -155,6 +156,7 @@ function App() {
 
   const handleNewConversation = () => {
     setInput('');
+    setCoreGreeting('');
     speech.cancelSpeaking();
     selectConversation(undefined);
   };
@@ -192,7 +194,13 @@ function App() {
         <div className="main-scroll">
           <section className="core-stage" aria-label="Estado del asistente">
             <div className="core-note"><span className="eyebrow">ASISTENTE PERSONAL</span><h2>Bienvenido,<br /><span>Federico.</span></h2><p>Una misión a la vez.<br />Construyamos lo que sigue.</p></div>
-            <Orb state={isLoading ? 'THINKING' : speech.orbState} />
+            <Orb state={isLoading ? 'THINKING' : speech.orbState} disabled={isLoading || speech.orbState === 'LISTENING'} greeting={coreGreeting && speech.orbState === 'SPEAKING' ? coreGreeting : undefined} onActivate={() => {
+              const greeting = 'Buenas, Federico. ¿En qué puedo ayudarte?';
+              setCoreGreeting(greeting);
+              speech.cancelSpeaking();
+              speech.speak(greeting, true);
+              if (!speech.ttsSupported) addSystemMessage(greeting);
+            }} />
             <div className="core-telemetry"><span className="eyebrow">ESTADO DE SESIÓN</span><div><span>Herramientas usadas</span><strong>{toolCards.length.toString().padStart(2, '0')}</strong></div><div><span>En ejecución</span><strong>{toolCards.filter((card) => card.status === 'running').length.toString().padStart(2, '0')}</strong></div><div><span>Por confirmar</span><strong className={pendingConfirmations.length ? 'amber-text' : ''}>{pendingConfirmations.length.toString().padStart(2, '0')}</strong></div></div>
           </section>
 

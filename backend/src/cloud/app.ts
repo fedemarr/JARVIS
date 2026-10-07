@@ -10,7 +10,13 @@ import { LlmProvider } from '../../../shared/llm';
 export function buildCloudApp(store = new CloudStore(), provider?: LlmProvider) {
   const app = Fastify({ bodyLimit: 128 * 1024, logger: { redact: ['req.headers.cookie', 'req.headers.authorization'] } });
   registerAuth(app, { allowLogin: (ip) => store.allowLogin(ip) });
-  app.addHook('onReady', async () => { await store.initialize(); });
+  let initialization: Promise<void> | undefined;
+  app.addHook('preHandler', async (request) => {
+    // Salud y estado de sesión pueden responder mientras Neon despierta.
+    if (request.url.split('?')[0] === '/api/health' || (request.url.split('?')[0] === '/api/session' && request.method !== 'POST')) return;
+    initialization ??= store.initialize().catch((error) => { initialization = undefined; throw error; });
+    await initialization;
+  });
   app.addHook('onSend', async (_request, reply, payload) => {
     reply.header('Cache-Control', 'no-store');
     return payload;

@@ -7,11 +7,13 @@ Asistente personal con interfaz web (chat), memoria long-term (SQLite), integrac
 La dirección actual del proyecto y las etapas para tickets laborales, acceso
 a dos computadoras y asistencia personal están en [ROADMAP.md](ROADMAP.md).
 El backend escucha en `127.0.0.1` por defecto; `HOST` configura esa dirección.
-La autenticación y la conexión entre equipos siguen pendientes.
+La versión publicada tiene acceso privado y memoria PostgreSQL en Neon.
+La conexión entre computadoras sigue pendiente. Ver [DEPLOYMENT.md](DEPLOYMENT.md).
 
 ```
 frontend/   React + Vite — chat, tarjetas de herramientas, confirmaciones, historial
-backend/    Node + Express + TypeScript — SSE, herramientas, agent, memoria SQLite
+backend/    Node + Fastify + TypeScript — SSE, herramientas, memoria SQLite local y PostgreSQL en nube
+api/        Adaptador de Fastify para Vercel
 shared/     Tipos compartidos entre backend y frontend
 n8n/        Automatizaciones y documentación de integración
 data/       Base SQLite (jarvis.db) — no versionada
@@ -59,6 +61,14 @@ El backend sirve el build de producción del frontend en `http://localhost:3001`
 | `N8N_BASE_URL` / `N8N_API_KEY` / `JARVIS_BASE_URL` | Integración n8n |
 
 ## Uso
+
+La web está en https://jarvis-eta-blue.vercel.app. La clave personal de ingreso
+está en el archivo local `data/jarvis-access-key.txt`, excluido de GitHub.
+Tocá la **J central** para escuchar «Buenas, Federico. ¿En qué puedo ayudarte?»
+con ondas y luces mientras habla. El saludo no consume la API; el chat usa
+Claude Haiku 4.5 y sí consume saldo. La voz depende del navegador y puede elegirse
+en el selector. En la nube están disponibles memoria, tareas, notas y análisis
+de tickets; el control de computadoras y la conexión con Claude Code siguen pendientes.
 
 La interfaz tiene una consola de mando con un núcleo animado y accesos para
 OhlimpiaERP, tareas, estudio y marketing. Los accesos preparan mensajes editables.
@@ -144,6 +154,6 @@ compila; falla solo si no hay key).
 
 ## Fuera de alcance
 
-ESP32, wake word, app mobile, multiusuario, auth, pagos, fine-tuning, modelos
+ESP32, wake word, app mobile, multiusuario, pagos, fine-tuning, modelos
 locales, WhatsApp (ver `JARVIS_N8N_PROMPT.md` §10).
 

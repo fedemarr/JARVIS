@@ -60,8 +60,10 @@ export function useSpeech({ stt, tts, onCommand }: UseSpeechOptions) {
   }, [stt]);
 
   const speak = useCallback(
-    (text: string) => {
-      if (!text || tts.isMuted()) return;
+    (text: string, force = false) => {
+      if (!text || !tts.supported) return;
+      if (force) { tts.setMuted(false); setIsMuted(false); }
+      if (tts.isMuted()) return;
       setOrbState('SPEAKING');
       tts.speak(text);
     },

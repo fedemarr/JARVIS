@@ -1,24 +1,12 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
-  "services": {
-    "frontend": {
-      "root": ".",
-      "framework": "vite",
-      "installCommand": "npm ci --workspace frontend --include-workspace-root",
-      "buildCommand": "npm run build -w frontend",
-      "outputDirectory": "frontend/dist"
-    },
-    "backend": {
-      "root": ".",
-      "framework": "fastify",
-      "entrypoint": "backend/cloud.ts",
-      "installCommand": "npm ci --workspace backend --include-workspace-root",
-      "buildCommand": "npm run build -w backend",
-      "functions": { "backend/cloud.ts": { "maxDuration": 180 } }
-    }
-  },
+  "framework": null,
+  "installCommand": "npm ci",
+  "buildCommand": "npm run build -w frontend",
+  "outputDirectory": "frontend/dist",
+  "functions": { "api/index.ts": { "maxDuration": 180 } },
   "rewrites": [
-    { "source": "/api/(.*)", "destination": { "service": "backend" } },
-    { "source": "/(.*)", "destination": { "service": "frontend" } }
+    { "source": "/api/(.*)", "destination": "/api/index" },
+    { "source": "/((?!api/).*)", "destination": "/index.html" }
   ]
 }

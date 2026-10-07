@@ -154,7 +154,7 @@ export async function runAgentTurn(opts: {
         };
         if (opts.log) await opts.log(entry);
         else {
-          const { ToolLogRepository } = await import('../memory/repositories/toolLogRepository');
+        const { ToolLogRepository } = await import('../memory/repositories/toolLogRepository.js');
           new ToolLogRepository().add(entry);
         }
         emit('tool_result', { id, name, ok: runResult.ok, summary, durationMs });

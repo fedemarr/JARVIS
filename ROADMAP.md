@@ -21,6 +21,12 @@ el micrófono, Chromium ni los workflows. Esas pruebas quedan pendientes.
 
 ## Primera etapa: un asistente local confiable
 
+Avance publicado: chat real con Claude Haiku 4.5, sesión privada y memoria,
+historial, tareas y notas en Neon Free. La J central saluda con voz del navegador
+y animación. Se verificaron respuesta real, persistencia tras recargar y acceso
+desde una vista móvil; el control de PC y la integración de OhlimpiaERP siguen pendientes.
+Actualizar Vite/Tailwind y sus dependencias de desarrollo en una iteración aparte.
+
 Prioridad confirmada por Federico: resolver tickets del trabajo. Luego ampliar
 a desarrollo, vida social, estudio y marketing de su empresa.
 

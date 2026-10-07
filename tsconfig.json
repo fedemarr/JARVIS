@@ -1,0 +1,5 @@
+{
+  "extends": "./backend/tsconfig.json",
+  "compilerOptions": { "outDir": "./dist", "noEmit": true },
+  "include": ["api/**/*.ts", "backend/src/**/*.ts", "shared/**/*.ts"]
+}

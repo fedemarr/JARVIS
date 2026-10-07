@@ -42,8 +42,26 @@ async function run() {
     const page = await browser.newPage({ viewport: { width: 1440, height: 1000 }, reducedMotion: 'reduce' });
     const errors = [];
     page.on('pageerror', (error) => errors.push(error.message));
+    await page.addInitScript(() => {
+      window.spoken = [];
+      Object.defineProperty(window, 'speechSynthesis', { value: {
+        getVoices: () => [], addEventListener() {}, removeEventListener() {}, cancel() {},
+        speak(utterance) { window.spoken.push(utterance.text); window.lastUtterance = utterance; },
+      } });
+    });
     await page.goto(`http://127.0.0.1:${server.address().port}`);
     await page.getByText('BACKEND CONECTADO', { exact: true }).waitFor();
+    const core = page.getByRole('button', { name: 'Saludar a Jarvis' });
+    await core.focus();
+    await core.press('Enter');
+    await page.waitForFunction(() => window.spoken.length === 1);
+    assert.deepEqual(await page.evaluate(() => window.spoken), ['Buenas, Federico. ¿En qué puedo ayudarte?']);
+    assert(await page.locator('.reactor-speaking').isVisible());
+    assert.equal(submitted, undefined, 'Saludar no consume la API');
+    await core.click();
+    await page.waitForFunction(() => window.spoken.length === 2);
+    await page.evaluate(() => window.lastUtterance.onend());
+    await page.locator('.reactor-idle').waitFor();
     await page.getByRole('button', { name: 'Ticket de prueba' }).click();
     await page.getByText('Historial de prueba.').waitFor();
     await page.getByRole('button', { name: 'Nueva misión' }).click();

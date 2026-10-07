@@ -1,87 +1,66 @@
-# Publicación de Jarvis
+# Jarvis publicado
 
-Repositorio elegido: https://github.com/fedemarr/JARVIS
+Web: https://jarvis-eta-blue.vercel.app
+Repositorio: https://github.com/fedemarr/JARVIS
+Proyecto Vercel: fmcodes-projects/jarvis.
 
-## Estado
+## Versión funcional (7 de octubre de 2026)
 
-El 7 de octubre de 2026 se publicó el código en la rama `main` del repositorio
-y se creó el proyecto `jarvis` en el equipo `fmcodes-projects`, conectado a GitHub.
-La interfaz está publicada en https://jarvis-eta-blue.vercel.app.
-El backend remoto todavía no está conectado: el chat no responde en esta versión.
-La carpeta local está vinculada a ese repositorio como `origin`.
-El proyecto existente `ohlimpiaerp` es independiente de este despliegue.
+La interfaz React/Vite y el backend Fastify están publicados en Vercel.
+`api/index.ts` adapta Fastify a una función Node; `vercel.json` dirige `/api/*`
+a esa función y sirve el build de la interfaz. La conexión es del mismo origen.
+La salud y el estado de sesión responden sin esperar a la memoria; las
+operaciones con datos inicializan el esquema cuando lo necesitan.
 
-Verificación: despliegue READY; navegador contra el enlace público con respuesta
-HTTP 200, importación de un ticket ficticio .md, estado sin backend y vista móvil
-sin desborde horizontal. La compilación y las pruebas locales con API simulada
-también pasaron. No se subieron claves, bases de datos ni perfiles de navegador.
+Claude Haiku 4.5 responde por streaming, con un máximo configurado de 512 tokens
+por respuesta del modelo y cuatro iteraciones de herramientas por turno.
+El chat consume el saldo de la API de Anthropic. El saludo al tocar la J usa
+la voz del navegador y no llama al modelo. Su timbre depende de las voces
+instaladas; la interfaz permite elegir una voz española disponible.
 
-## Distribución prevista
+Neon guarda conversaciones, preferencias, tareas y notas. Se creó únicamente
+`jarvis-memory` en el plan `free_v3`, tras la aceptación de términos de Federico.
+No se contrató Render ni se cambió a un plan pago de alojamiento. Los servicios
+gratuitos tienen cuotas y pueden suspenderse o tardar en despertar.
 
-- Código: repositorio público de GitHub, excluyendo datos y credenciales.
-- Interfaz React/Vite: Vercel.
-- Backend Fastify y memoria: servicio persistente, con autenticación.
-- Herramientas de PC: agentes instalados en cada computadora, conectados al
-  coordinador. Un despliegue web no tiene acceso automático a esas computadoras.
+## Acceso y secretos
 
-## Backend gratuito preparado
+Las claves de Anthropic y de acceso están únicamente en variables de producción
+y archivos locales excluidos. La clave de ingreso generada está en
+`data/jarvis-access-key.txt`; no es la clave de Anthropic.
+La sesión dura ocho horas y usa una cookie HttpOnly, Secure y SameSite=Strict.
+Las rutas privadas exigen sesión; los orígenes se validan y los intentos de
+login se limitan con registro persistente. No guardar credenciales en el chat.
+La clave compartida por chat debe reemplazarse por una nueva en Anthropic.
 
-Federico descartó el alojamiento pago. Se creó `jarvis-memory` en Neon,
-exclusivamente en el plan `free_v3`, conectado a la producción del proyecto
-`fmcodes-projects/jarvis`. Los términos de la integración fueron aceptados por
-Federico. El código de nube está en `backend/cloud.ts` y `backend/src/cloud/`;
-usa PostgreSQL sin depender de SQLite local y define el segundo servicio en
-`vercel.json`. No se contrató Render ni se cambió el plan de Vercel.
+Variables del backend: `DATABASE_URL`, `JARVIS_MODE=cloud`, `JARVIS_ACCESS_KEY`,
+`ALLOWED_ORIGINS`, `LLM_PROVIDER=anthropic`, `AI_MODEL=claude-haiku-4-5`,
+`LLM_MAX_OUTPUT_TOKENS=512` y `ANTHROPIC_API_KEY`. Nunca usar variables `VITE_*`
+para secretos.
 
-Se verificaron conversaciones, memorias, tareas y notas contra PostgreSQL real
-entre instancias independientes; las filas ficticias de prueba se eliminaron.
-Las pruebas de autenticación y de herramientas Claude simuladas pasan. Se
-actualizaron Fastify y plugins y npm reportó cero vulnerabilidades.
+## Comprobaciones
 
-Pendiente: guardar `ANTHROPIC_API_KEY` en el `.env` local, configurar los secretos
-de producción, probar una llamada pequeña a Claude y desplegar. Federico ya
-autorizó guardar la clave de Anthropic y una nueva clave de acceso como secretos
-solo en `fmcodes-projects/jarvis`. La configuración anterior de Gemini no se envió:
-la revisión automática la rechazó antes de ejecutarla. No se eludió ese bloqueo.
-El despliegue actual continúa siendo la interfaz sin backend mientras falta la clave.
+Pasaron tipos, compilación y pruebas del backend: validación del chat,
+autenticación, vencimiento y manipulación de cookies, bloqueo de intentos,
+historial y reconstrucción de llamadas de herramientas de Claude.
+La prueba del navegador verifica importación MD/HTML, envío manual, saludo
+exacto al tocar la J, animación al hablar y vista móvil sin desborde.
+La prueba de producción verificó ingreso, respuesta real de Claude, historial
+tras recargar, saludo, vista móvil y cierre de sesión. También se verificaron
+memorias, tareas y notas con PostgreSQL real entre instancias independientes.
 
-## Requisitos antes de publicar una versión funcional
+Se corrigió la alerta crítica de dependencias con actualizaciones compatibles.
+Quedan nueve alertas en herramientas de desarrollo relacionadas con Vite,
+Tailwind y dependencias de CSS; su actualización requiere una migración separada.
 
-1. Implementar autenticación y protección de rutas de chat, memoria y acciones.
-2. Elegir y preparar el alojamiento del backend y su almacenamiento persistente.
-3. Configurar `/api` en la interfaz publicada para que llegue al backend por
-   HTTPS. El proxy de Vite solo funciona durante desarrollo; no se publica.
-4. Configurar las claves en el backend, nunca como variables `VITE_*`, que se
-   incluyen en el código del navegador.
-5. Verificar chat por streaming, importación de tickets, historial y
-   confirmaciones contra el backend real desde una vista previa.
+## Capacidades y próximos pasos
 
-## Ajustes previstos en Vercel
+Esta versión analiza tickets importados y usa memoria, tareas, notas, cálculos
+y hora. La integración automática con OhlimpiaERP y Claude Code, el control de
+computadoras, la búsqueda web y una aplicación móvil siguen pendientes.
+Las herramientas de PC del servidor local no están expuestas en la nube.
+El proyecto Vercel `ohlimpiaerp` no fue modificado.
 
-Importar el repositorio como monorepo. Si se usa la raíz del repositorio como
-Root Directory, los ajustes de la interfaz serán:
-
-| Ajuste | Valor |
-| --- | --- |
-| Framework | Vite |
-| Build Command | `npm run build -w frontend` |
-| Output Directory | `frontend/dist` |
-| Install Command | `npm ci --workspace frontend --include-workspace-root` |
-
-El archivo `vercel.json` de la raíz define un único servicio `frontend`, con
-raíz en el monorepo y estas opciones dentro del servicio. Una regla pública
-dirige las peticiones a esa interfaz; no se despliega el backend. La instalación se
-limita al workspace de la interfaz y las dependencias de la raíz, evitando
-instalar el backend y SQLite en el despliegue del frontend.
-
-No usar `npm run build` de la raíz para este despliegue de la interfaz: también
-compila el backend, que requiere su propio alojamiento. Estos ajustes no
-resuelven la conexión `/api`; queda pendiente definir el backend.
-
-## Archivos excluidos del repositorio
-
-`.env` y variantes privadas, `data/`, bases SQLite, `n8n/n8n_data/`, capturas
-locales, builds, dependencias y `.vercel/`. Los tickets laborales deben
-guardarse fuera del código público o en una carpeta de datos excluida.
-
-Documentación oficial: [Vite en Vercel](https://vercel.com/docs/frameworks/frontend/vite).
+`.env*` privados, datos, tickets, SQLite, perfiles de navegador, `node_modules`,
+builds y `.vercel` están excluidos de GitHub. Revisar estos límites antes de
+publicar nuevos archivos laborales.

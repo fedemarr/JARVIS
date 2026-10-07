@@ -106,24 +106,30 @@ class BrowserTts implements TtsProvider {
   private muted = false;
   private selectedVoiceURI: string | null = null;
   private onEndCb: () => void = () => {};
+  private pendingSpeech: number | undefined;
+  private generation = 0;
 
   speak(text: string): void {
     if (!this.supported || this.muted || !text.trim()) return;
+    this.cancel();
+    const generation = this.generation;
     const utterance = new SpeechSynthesisUtterance(text);
     utterance.lang = 'es-AR';
-    utterance.rate = 1.05;
+    utterance.rate = 0.97;
     const voice = this.pickVoice();
     if (voice) utterance.voice = voice;
-    utterance.onend = () => this.onEndCb();
-    utterance.onerror = () => this.onEndCb();
-    speechSynthesis.cancel();
+    utterance.onend = () => { if (generation === this.generation) this.onEndCb(); };
+    utterance.onerror = () => { if (generation === this.generation) this.onEndCb(); };
     // Chrome: cancelar e inmediatamente hablar puede descartar la utterance.
-    window.setTimeout(() => {
-      if (!this.muted) speechSynthesis.speak(utterance);
+    this.pendingSpeech = window.setTimeout(() => {
+      this.pendingSpeech = undefined;
+      if (!this.muted && generation === this.generation) speechSynthesis.speak(utterance);
     }, 50);
   }
 
   cancel(): void {
+    this.generation++;
+    if (this.pendingSpeech !== undefined) { clearTimeout(this.pendingSpeech); this.pendingSpeech = undefined; }
     if (this.supported) {
       speechSynthesis.cancel();
     }

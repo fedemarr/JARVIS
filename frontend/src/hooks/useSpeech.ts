@@ -49,11 +49,12 @@ export function useSpeech({ stt, tts, onCommand }: UseSpeechOptions) {
 
   const startListening = useCallback(() => {
     if (listeningRef.current) return;
+    tts.cancel();
     listeningRef.current = true;
     setPartialTranscript('');
     setOrbState('LISTENING');
     stt.start();
-  }, [stt]);
+  }, [stt, tts]);
 
   const stopListening = useCallback(() => {
     stt.stop();
@@ -79,6 +80,7 @@ export function useSpeech({ stt, tts, onCommand }: UseSpeechOptions) {
     setIsMuted((prev) => {
       const next = !prev;
       tts.setMuted(next);
+      if (next) setOrbState('IDLE');
       return next;
     });
   }, [tts]);
@@ -87,6 +89,7 @@ export function useSpeech({ stt, tts, onCommand }: UseSpeechOptions) {
     (voiceURI: string) => {
       setSelectedVoice(voiceURI);
       tts.setVoice(voiceURI);
+      setOrbState('IDLE');
     },
     [tts],
   );

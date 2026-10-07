@@ -8,6 +8,7 @@ const { chromium } = require('playwright');
 const dist = path.join(__dirname, 'dist');
 const artifacts = path.join(__dirname, '..', 'artifacts');
 let submitted;
+const replyParts = ['Análisis de prueba completado. Esta es la primera parte de una respuesta larga. ', 'La segunda parte también debe escucharse completa y sin interrupciones. ', 'Fin de la respuesta.'];
 const server = http.createServer((req, res) => {
   res.setHeader('Content-Type', 'application/json');
   if (req.url === '/api/health') return res.end(JSON.stringify({ provider: 'modo prueba', model: 'API simulada' }));
@@ -20,7 +21,7 @@ const server = http.createServer((req, res) => {
     req.on('end', () => {
       submitted = JSON.parse(body);
       res.setHeader('Content-Type', 'text/event-stream');
-      res.end('event: token\ndata: {"text":"Análisis de prueba completado."}\n\nevent: done\ndata: {}\n\n');
+      res.end(replyParts.map(text => `event: token\ndata: ${JSON.stringify({text})}\n\n`).join('') + 'event: done\ndata: {}\n\n');
     });
     return;
   }
@@ -78,7 +79,16 @@ async function run() {
     await upload.setInputFiles({ name: 'ticket.md', mimeType: 'text/markdown', buffer: Buffer.from('# Ticket\nCorregir validación de factura.') });
     await page.waitForFunction(() => document.querySelector('textarea').value.includes('Corregir validación'));
     await textarea.press('Enter');
-    await page.getByText('Análisis de prueba completado.', { exact: true }).waitFor();
+    await page.getByText(replyParts.join(''), { exact: true }).waitFor();
+    await page.waitForFunction(() => window.spoken.length === 3);
+    for (let i = 0; i < replyParts.length; i++) {
+      assert.equal((await page.evaluate(index => window.spoken[index + 2], i)).trim(), replyParts[i].trim());
+      assert(await page.locator('.reactor-speaking').isVisible(), 'Animación durante toda la lectura');
+      await page.evaluate(() => window.lastUtterance.onend());
+      if (i < replyParts.length - 1) await page.waitForFunction(count => window.spoken.length === count, i + 4);
+    }
+    await page.locator('.reactor-idle').waitFor();
+    assert.equal(await page.evaluate(() => window.spoken.slice(2).join('')), replyParts.join(''), 'Leer toda la respuesta en orden');
     assert.match(submitted.message, /Corregir validación/);
     await upload.setInputFiles({ name: 'grande.md', mimeType: 'text/markdown', buffer: Buffer.alloc(66000, 'x') });
     await page.getByRole('alert').waitFor();
@@ -96,7 +106,7 @@ async function run() {
     assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth), false, 'Sin desborde horizontal en móvil');
     await page.screenshot({ path: path.join(artifacts, 'jarvis-mobile.png'), fullPage: true });
     assert.deepEqual(errors, []);
-    console.log('PASS: historial, nueva misión, accesos, importación MD/HTML, envío, límites y vista móvil. API simulada.');
+    console.log('PASS: saludo, lectura completa en orden, historial, importación MD/HTML, envío, límites y vista móvil. API simulada.');
   } finally {
     if (browser) await browser.close();
     await new Promise((resolve) => server.close(resolve));

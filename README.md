@@ -67,7 +67,11 @@ está en el archivo local `data/jarvis-access-key.txt`, excluido de GitHub.
 Tocá la **J central** para escuchar «Buenas, Federico. ¿En qué puedo ayudarte?»
 con ondas y luces mientras habla. El saludo no consume la API; el chat usa
 Claude Haiku 4.5 y sí consume saldo. La voz depende del navegador y puede elegirse
-en el selector. En la nube están disponibles memoria, tareas, notas y análisis
+en el selector. Las respuestas se leen completas en una cola de segmentos cortos;
+un fragmento nuevo no corta el anterior. Silenciar o iniciar otra misión detiene
+la lectura. El núcleo azul tiene anillos giratorios y barrido circular, respetando
+la preferencia del dispositivo para reducir movimiento.
+En la nube están disponibles memoria, tareas, notas y análisis
 de tickets; el control de computadoras y la conexión con Claude Code siguen pendientes.
 
 La interfaz tiene una consola de mando con un núcleo animado y accesos para

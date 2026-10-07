@@ -108,18 +108,41 @@ class BrowserTts implements TtsProvider {
   private onEndCb: () => void = () => {};
   private pendingSpeech: number | undefined;
   private generation = 0;
+  private queue: string[] = [];
+  private currentUtterance: SpeechSynthesisUtterance | null = null;
 
   speak(text: string): void {
     if (!this.supported || this.muted || !text.trim()) return;
-    this.cancel();
+    let remaining = text;
+    while (remaining.length > 220) {
+      const space = remaining.lastIndexOf(' ', 220);
+      const end = space >= 80 ? space + 1 : 220;
+      this.queue.push(remaining.slice(0, end));
+      remaining = remaining.slice(end);
+    }
+    if (remaining) this.queue.push(remaining);
+    this.speakNext();
+  }
+
+  private speakNext(): void {
+    if (this.currentUtterance || this.pendingSpeech !== undefined || this.muted) return;
+    const text = this.queue.shift();
+    if (!text) return;
     const generation = this.generation;
     const utterance = new SpeechSynthesisUtterance(text);
+    this.currentUtterance = utterance;
     utterance.lang = 'es-AR';
     utterance.rate = 0.97;
     const voice = this.pickVoice();
     if (voice) utterance.voice = voice;
-    utterance.onend = () => { if (generation === this.generation) this.onEndCb(); };
-    utterance.onerror = () => { if (generation === this.generation) this.onEndCb(); };
+    const finish = () => {
+      if (generation !== this.generation || this.currentUtterance !== utterance) return;
+      this.currentUtterance = null;
+      if (this.queue.length) this.speakNext();
+      else this.onEndCb();
+    };
+    utterance.onend = finish;
+    utterance.onerror = finish;
     // Chrome: cancelar e inmediatamente hablar puede descartar la utterance.
     this.pendingSpeech = window.setTimeout(() => {
       this.pendingSpeech = undefined;
@@ -129,6 +152,8 @@ class BrowserTts implements TtsProvider {
 
   cancel(): void {
     this.generation++;
+    this.queue = [];
+    this.currentUtterance = null;
     if (this.pendingSpeech !== undefined) { clearTimeout(this.pendingSpeech); this.pendingSpeech = undefined; }
     if (this.supported) {
       speechSynthesis.cancel();

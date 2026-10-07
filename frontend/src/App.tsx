@@ -86,6 +86,8 @@ function App() {
   const commandRef = useRef<(text: string) => Promise<void>>(async () => {});
   commandRef.current = async (text: string) => {
     setInput('');
+    setCoreGreeting('');
+    speech.cancelSpeaking();
     speech.setThinking();
     pendingSpeechRef.current = '';
     const reply = await sendMessage(text, currentConversationId, handleStreamToken);
@@ -97,7 +99,9 @@ function App() {
   };
 
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    const feed = messagesEndRef.current?.closest('.main-scroll');
+    if (!messages.some((message) => message.role === 'user')) feed?.scrollTo({ top: 0 });
+    else messagesEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
   }, [messages]);
 
   useEffect(() => {
@@ -144,6 +148,8 @@ function App() {
     const text = input.trim();
     if (!text || isLoading) return;
     setInput('');
+    setCoreGreeting('');
+    speech.cancelSpeaking();
     speech.setThinking();
     pendingSpeechRef.current = '';
     const reply = await sendMessage(text, currentConversationId, handleStreamToken);
@@ -194,7 +200,7 @@ function App() {
         <div className="main-scroll">
           <section className="core-stage" aria-label="Estado del asistente">
             <div className="core-note"><span className="eyebrow">ASISTENTE PERSONAL</span><h2>Bienvenido,<br /><span>Federico.</span></h2><p>Una misión a la vez.<br />Construyamos lo que sigue.</p></div>
-            <Orb state={isLoading ? 'THINKING' : speech.orbState} disabled={isLoading || speech.orbState === 'LISTENING'} greeting={coreGreeting && speech.orbState === 'SPEAKING' ? coreGreeting : undefined} onActivate={() => {
+            <Orb state={speech.orbState === 'SPEAKING' ? 'SPEAKING' : isLoading ? 'THINKING' : speech.orbState} disabled={isLoading || speech.orbState === 'LISTENING'} greeting={coreGreeting && speech.orbState === 'SPEAKING' ? coreGreeting : undefined} onActivate={() => {
               const greeting = 'Buenas, Federico. ¿En qué puedo ayudarte?';
               setCoreGreeting(greeting);
               speech.cancelSpeaking();

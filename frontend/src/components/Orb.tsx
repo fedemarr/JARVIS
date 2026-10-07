@@ -17,7 +17,11 @@ export function Orb({ state, onActivate, disabled, greeting }: { state: OrbState
         <div className="reactor-orbit orbit-middle" />
         <div className="reactor-orbit orbit-inner" />
         <div className="reactor-crosshair" />
-        {onActivate ? <button type="button" className="reactor-heart reactor-trigger" onClick={onActivate} disabled={disabled} aria-label="Saludar a Jarvis" title="Tocá la J para escuchar a Jarvis"><span>J</span></button> : <div className="reactor-heart"><span>J</span></div>}
+        <div className="reactor-orbit orbit-segments" aria-hidden="true" />
+        <div className="reactor-orbit orbit-tracer" aria-hidden="true" />
+        <div className="reactor-sweep" aria-hidden="true" />
+        <div className="reactor-reticle" aria-hidden="true"><i /><i /><i /><i /></div>
+        {onActivate ? <button type="button" className="reactor-heart reactor-trigger" onClick={onActivate} disabled={disabled} aria-label="Saludar a Jarvis" title="Tocá la J para escuchar a Jarvis"><span>J</span><small className="core-wordmark">J.A.R.V.I.S.</small></button> : <div className="reactor-heart"><span>J</span><small className="core-wordmark">J.A.R.V.I.S.</small></div>}
         <div className="reactor-voice-ripple" aria-hidden="true" />
         <div className="reactor-voice-ripple ripple-delayed" aria-hidden="true" />
         <span className="reactor-coordinate coord-left">J / 01</span>

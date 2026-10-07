@@ -27,3 +27,6 @@ test-results/
 
 # Archivo accidental de una sesion de terminal
 backend/process.exit(0)
+
+.vercel
+.env*

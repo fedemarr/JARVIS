@@ -44,7 +44,9 @@ Root Directory, los ajustes de la interfaz serán:
 | Output Directory | `frontend/dist` |
 | Install Command | `npm ci --workspace frontend --include-workspace-root` |
 
-El archivo `vercel.json` de la raíz define estos ajustes. La instalación se
+El archivo `vercel.json` de la raíz define un único servicio `frontend`, con
+raíz en el monorepo y estas opciones dentro del servicio. Una regla pública
+dirige las peticiones a esa interfaz; no se despliega el backend. La instalación se
 limita al workspace de la interfaz y las dependencias de la raíz, evitando
 instalar el backend y SQLite en el despliegue del frontend.
 

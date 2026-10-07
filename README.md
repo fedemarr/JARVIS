@@ -8,6 +8,8 @@ La dirección actual del proyecto y las etapas para tickets laborales, acceso
 a dos computadoras y asistencia personal están en [ROADMAP.md](ROADMAP.md).
 El backend escucha en `127.0.0.1` por defecto; `HOST` configura esa dirección.
 La versión publicada tiene acceso privado y memoria PostgreSQL en Neon.
+Ahora puede buscar información en internet, leer páginas públicas y consultar
+el clima actual por ciudad. Ver [consultas de internet](backend/src/internet/README.md).
 La conexión entre computadoras sigue pendiente. Ver [DEPLOYMENT.md](DEPLOYMENT.md).
 
 ### Jarvis Desktop y voz natural

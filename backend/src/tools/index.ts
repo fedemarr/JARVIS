@@ -9,6 +9,7 @@ import { writeFile } from './writeFile';
 import { searchInFiles } from './searchInFiles';
 import { executeCommand } from './executeCommand';
 import { webSearch } from './webSearch';
+import { getWeather, readWebPage } from '../internet/tools';
 import { browser } from './browser';
 import { whatsapp } from './whatsapp';
 import { n8nListWorkflows } from './n8nListWorkflows';
@@ -47,6 +48,8 @@ const TOOLS: Tool[] = [
   searchInFiles,
   executeCommand,
   webSearch,
+  getWeather,
+  readWebPage,
   browser,
   whatsapp,
   n8nListWorkflows,
@@ -77,7 +80,7 @@ export type ToolRegistry = {
 
 // Las herramientas de PC se habilitarán mediante agentes de dispositivos.
 const CLOUD_TOOLS = new Set([
-  'get_current_time', 'calculator', 'web_search', 'remember', 'recall', 'forget',
+  'get_current_time', 'calculator', 'web_search', 'get_weather', 'read_web_page', 'remember', 'recall', 'forget',
   'create_task', 'list_tasks', 'complete_task', 'create_note', 'search_notes',
 ]);
 

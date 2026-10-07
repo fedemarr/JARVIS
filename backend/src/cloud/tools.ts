@@ -4,6 +4,7 @@ import { zodToJsonSchema, safeParseArgs } from '../tools/schema';
 import { calculator } from '../tools/calculator';
 import { getCurrentTime } from '../tools/getCurrentTime';
 import { CloudStore } from './store';
+import { internetSearch, readWebPage, getWeather } from '../internet/tools';
 
 const text = z.string().trim().min(1).max(4000);
 export function cloudTools(store: CloudStore): ToolRegistry {
@@ -11,7 +12,7 @@ export function cloudTools(store: CloudStore): ToolRegistry {
     return { name, description, schema, handler, dangerous: false, dangerReason: () => null };
   }
   const tools: Tool[] = [
-    calculator, getCurrentTime,
+    calculator, getCurrentTime, internetSearch, readWebPage, getWeather,
     tool('remember', 'Guarda una preferencia o dato estable que el usuario quiera recordar.', z.object({ category: z.enum(['preference','project','fact','task_context','note']), key: text.max(200), value: text }), async ({ category, key, value }) => JSON.stringify(await store.remember(category,key,value))),
     tool('recall', 'Busca memorias personales guardadas.', z.object({ query: text.max(200) }), async ({ query }) => JSON.stringify(await store.recall(query))),
     tool('create_task', 'Crea una tarea pendiente.', z.object({ title: text.max(300), detail: text.optional(), dueDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional() }), async ({ title, detail, dueDate }) => JSON.stringify(await store.createTask(title,detail,dueDate))),
@@ -30,7 +31,7 @@ export function cloudTools(store: CloudStore): ToolRegistry {
       const parsed = safeParseArgs(selected.schema, args);
       if (parsed.ok === false) return { ok: false, content: parsed.error };
       try { return { ok: true, content: await selected.handler(parsed.data) }; }
-      catch { return { ok: false, content: 'No se pudo completar la operación. Volvé a intentarlo.' }; }
+      catch (error) { return { ok: false, content: ['web_search','read_web_page','get_weather'].includes(name) && error instanceof Error ? error.message : 'No se pudo completar la operación. Volvé a intentarlo.' }; }
     },
   };
 }

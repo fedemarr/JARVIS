@@ -1,8 +1,9 @@
 import { z } from 'zod';
 import { Tool } from './index';
+import { internetSearch } from '../internet/tools';
 
 const schema = z.object({
-  query: z.string().min(1, 'Falta el argumento query.'),
+  query: z.string().trim().min(2, 'Falta el argumento query.').max(300),
 });
 
 interface TavilyResult {
@@ -13,14 +14,14 @@ interface TavilyResult {
 
 export const webSearch: Tool<typeof schema> = {
   name: 'web_search',
-  description: 'Busca información actualizada en la web usando Tavily. Args: query.',
+  description: 'Busca información actualizada en internet; devuelve fuentes y fragmentos. Args: query.',
   schema,
   dangerous: false,
   dangerReason: () => null,
   handler: async ({ query }) => {
     const apiKey = process.env.SEARCH_API_KEY;
     if (!apiKey) {
-      return 'No hay SEARCH_API_KEY configurada en .env. Agregala para usar web_search.';
+      return internetSearch.handler({query});
     }
     try {
       const response = await fetch('https://api.tavily.com/search', {

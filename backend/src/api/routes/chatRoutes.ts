@@ -31,7 +31,13 @@ export async function chatRoutes(fastify: FastifyInstance) {
   const messageRepo = new MessageRepository();
   const registry = getToolRegistry();
 
-  fastify.post<{ Body: ChatRequestBody }>('/chat', async (request, reply) => {
+  fastify.post<{ Body: ChatRequestBody }>('/chat', {
+    schema: { body: { type: 'object', required: ['message'], additionalProperties: false, properties: {
+      conversationId: { type: 'string', format: 'uuid' },
+      message: { type: 'string', minLength: 1, maxLength: 40000, pattern: '\\S' },
+    } } },
+  }, async (request, reply) => {
+    reply.hijack();
     reply.raw.writeHead(200, {
       'Content-Type': 'text/event-stream',
       'Cache-Control': 'no-cache',
@@ -99,13 +105,17 @@ export async function chatRoutes(fastify: FastifyInstance) {
     }
   });
 
-  fastify.post<{ Body: ConfirmRequestBody }>('/confirm', async (request, reply) => {
+  fastify.post<{ Body: ConfirmRequestBody }>('/confirm', {
+    schema: { body: { type: 'object', required: ['pendingId', 'approved'], additionalProperties: false, properties: {
+      pendingId: { type: 'string', format: 'uuid' }, approved: { type: 'boolean' },
+    } } },
+  }, async (request, reply) => {
     const { pendingId, approved } = request.body;
     if (!pendingId) {
       reply.status(400).send({ ok: false, message: 'pendingId es requerido' });
       return;
     }
-    const resolved = resolvePendingConfirmation(pendingId, !!approved);
+    const resolved = resolvePendingConfirmation(pendingId, approved);
     if (!resolved) {
       reply.status(404).send({ ok: false, message: 'No hay una confirmación pendiente con ese pendingId' });
       return;

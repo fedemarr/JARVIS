@@ -7,9 +7,18 @@
       "installCommand": "npm ci --workspace frontend --include-workspace-root",
       "buildCommand": "npm run build -w frontend",
       "outputDirectory": "frontend/dist"
+    },
+    "backend": {
+      "root": ".",
+      "framework": "fastify",
+      "entrypoint": "backend/cloud.ts",
+      "installCommand": "npm ci --workspace backend --include-workspace-root",
+      "buildCommand": "npm run build -w backend",
+      "functions": { "backend/cloud.ts": { "maxDuration": 180 } }
     }
   },
   "rewrites": [
+    { "source": "/api/(.*)", "destination": { "service": "backend" } },
     { "source": "/(.*)", "destination": { "service": "frontend" } }
   ]
 }

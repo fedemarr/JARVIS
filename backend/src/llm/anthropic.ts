@@ -6,9 +6,8 @@ export class AnthropicLlmProvider implements LlmProvider {
   private modelName: string;
 
   constructor(apiKey: string, modelName: string) {
-    // Anthropic SDK can be initialized without an API key, but calls will fail.
-    // The prompt says "dejala completa y funcional, sin key configurada."
-    this.anthropic = new Anthropic({ apiKey: apiKey || 'dummy-key' });
+    if (!apiKey) throw new Error('ANTHROPIC_API_KEY is not set.');
+    this.anthropic = new Anthropic({ apiKey, maxRetries: 0 });
     this.modelName = modelName;
   }
 
@@ -16,6 +15,7 @@ export class AnthropicLlmProvider implements LlmProvider {
     system: string;
     messages: LlmMessage[];
     tools: ToolDefinition[];
+    signal?: AbortSignal;
   }): AsyncIterable<LlmEvent> {
     const anthropicMessages = this.mapLlmMessagesToAnthropic(opts.messages);
     const anthropicTools = this.mapToolDefinitionsToAnthropic(opts.tools);
@@ -26,10 +26,13 @@ export class AnthropicLlmProvider implements LlmProvider {
         system: opts.system,
         messages: anthropicMessages,
         tools: anthropicTools.length > 0 ? anthropicTools : undefined,
-        max_tokens: 4096, // A reasonable default
-      });
+        max_tokens: Math.min(4096, Math.max(128, Number(process.env.LLM_MAX_OUTPUT_TOKENS) || 1024)),
+      }, { signal: opts.signal });
 
       let toolCallsBuffer: LlmToolCall[] = [];
+      const toolsByIndex = new Map<number, LlmToolCall>();
+      const partialInputs = new Map<number, string>();
+      let ended = false;
       let stopReason: string | null | undefined;
 
       for await (const chunk of stream) {
@@ -42,9 +45,20 @@ export class AnthropicLlmProvider implements LlmProvider {
             args: (chunk.content_block.input ?? {}) as Record<string, unknown>,
           };
           toolCallsBuffer.push(toolCall);
+          toolsByIndex.set(chunk.index, toolCall);
+        } else if (chunk.type === 'content_block_delta' && chunk.delta.type === 'input_json_delta') {
+          partialInputs.set(chunk.index, (partialInputs.get(chunk.index) || '') + chunk.delta.partial_json);
+        } else if (chunk.type === 'content_block_stop' && toolsByIndex.has(chunk.index)) {
+          const input = partialInputs.get(chunk.index);
+          if (input) {
+            const parsed = JSON.parse(input);
+            if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) throw new Error('Claude devolvió argumentos de herramienta inválidos.');
+            toolsByIndex.get(chunk.index)!.args = parsed;
+          }
         } else if (chunk.type === 'message_delta') {
           stopReason = chunk.delta.stop_reason as string | null;
         } else if (chunk.type === 'message_stop') {
+          ended = true;
           if (stopReason === 'tool_use' && toolCallsBuffer.length > 0) {
             yield { type: 'tool_calls', calls: toolCallsBuffer };
             toolCallsBuffer = []; // Clear buffer after emitting
@@ -55,15 +69,15 @@ export class AnthropicLlmProvider implements LlmProvider {
         }
       }
       // If stream ends without a message_stop chunk (e.g., due to an error or unexpected end)
-      if (toolCallsBuffer.length > 0) {
+      if (!ended && toolCallsBuffer.length > 0) {
         yield { type: 'tool_calls', calls: toolCallsBuffer };
         yield { type: 'end', reason: 'tool_calls' };
-      } else {
+      } else if (!ended) {
         yield { type: 'end', reason: 'stop' };
       }
 
     } catch (error: any) {
-      console.error('Anthropic streaming error:', error);
+      console.error('Anthropic streaming error:', error.status || error.name);
       yield { type: 'error', message: error.message || 'An unknown error occurred with Anthropic.' };
     }
   }
@@ -99,16 +113,15 @@ export class AnthropicLlmProvider implements LlmProvider {
           });
         }
       } else if (msg.role === 'tool') {
-        for (const result of msg.results) {
-          anthropicMessages.push({
-            role: 'user', // Tool results are sent back as user messages
-            content: [{
+        anthropicMessages.push({
+          role: 'user',
+          content: msg.results.map((result) => ({
               type: 'tool_result',
               tool_use_id: result.id,
               content: result.content,
-            }],
-          });
-        }
+              is_error: !result.ok,
+          })),
+        });
       }
     }
     return anthropicMessages;

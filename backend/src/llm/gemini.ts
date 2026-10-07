@@ -1,8 +1,7 @@
 import { LlmProvider, LlmMessage, LlmEvent, LlmToolCall, ToolDefinition } from '../../../shared/llm';
 
-function sleep(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
+import { setTimeout as delay } from 'timers/promises';
+const sleep = (ms: number, signal?: AbortSignal) => delay(ms, undefined, { signal });
 
 interface GeminiFunctionCall {
   name: string;
@@ -41,6 +40,7 @@ export class GeminiLlmProvider implements LlmProvider {
     system: string;
     messages: LlmMessage[];
     tools: ToolDefinition[];
+    signal?: AbortSignal;
   }): AsyncIterable<LlmEvent> {
     const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(this.modelName)}:streamGenerateContent?alt=sse`;
     const body = {
@@ -48,7 +48,7 @@ export class GeminiLlmProvider implements LlmProvider {
       contents: this.mapLlmMessagesToGemini(opts.messages),
       tools: this.mapToolDefinitionsToGemini(opts.tools),
     };
-    const response = await this.fetchWithRetry(url, body);
+    const response = await this.fetchWithRetry(url, body, 5, opts.signal);
     if (!response) {
       yield { type: 'error', message: 'No se pudo contactar a Gemini tras varios intentos.' };
       return;
@@ -131,7 +131,7 @@ export class GeminiLlmProvider implements LlmProvider {
     }
   }
 
-  private async fetchWithRetry(url: string, body: unknown, maxAttempts = 5): Promise<Response | null> {
+  private async fetchWithRetry(url: string, body: unknown, maxAttempts = 5, signal?: AbortSignal): Promise<Response | null> {
     for (let attempt = 1; attempt <= maxAttempts; attempt++) {
       let response: Response;
       try {
@@ -142,10 +142,12 @@ export class GeminiLlmProvider implements LlmProvider {
             'Content-Type': 'application/json',
           },
           body: JSON.stringify(body),
+          signal,
         });
       } catch (error: any) {
+        if (signal?.aborted) throw error;
         if (attempt === maxAttempts) return null;
-        await sleep(3000 * attempt);
+        await sleep(3000 * attempt, signal);
         continue;
       }
 
@@ -153,7 +155,7 @@ export class GeminiLlmProvider implements LlmProvider {
         if (attempt === maxAttempts) return response;
         const waitMs = await this.retryDelayFrom(response);
         console.log(`[gemini] attempt ${attempt}/${maxAttempts} got HTTP ${response.status}, retrying in ${Math.round(waitMs / 1000)}s`);
-        await sleep(waitMs);
+        await sleep(waitMs, signal);
         continue;
       }
       return response;

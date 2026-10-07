@@ -13,5 +13,5 @@
     "forceConsistentCasingInFileNames": true,
     "types": ["node"]
   },
-  "include": ["src", "../shared"]
+  "include": ["src", "cloud.ts", "../shared"]
 }

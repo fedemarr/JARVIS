@@ -2,7 +2,7 @@ import { randomUUID } from 'crypto';
 import { LlmProvider, LlmMessage, LlmToolCall, LlmToolResult } from '../../../shared/llm';
 import { ToolRegistry } from '../tools';
 import { redactArgs, summarize } from '../security/redact';
-import { ToolLogRepository } from '../memory/repositories/toolLogRepository';
+import type { ToolLog } from '../memory/repositories/toolLogRepository';
 
 const MAX_ITERATIONS = 8;
 const PENDING_TIMEOUT_MS = 5 * 60 * 1000;
@@ -46,27 +46,30 @@ export function requestConfirmation(pendingId: string): Promise<boolean> {
   });
 }
 
-const logRepo = new ToolLogRepository();
-
 export async function runAgentTurn(opts: {
   provider: LlmProvider;
   systemPrompt: string;
   history: LlmMessage[];
   registry: ToolRegistry;
   emit: SseEmitter;
+  signal?: AbortSignal;
+  log?: (entry: Omit<ToolLog, 'id' | 'created_at'>) => Promise<void> | void;
+  maxIterations?: number;
 }): Promise<RunResult> {
   const { provider, systemPrompt, history, registry, emit } = opts;
   const messages = [...history];
   const added: LlmMessage[] = [];
   let finalText = '';
 
-  for (let iteration = 0; iteration < MAX_ITERATIONS; iteration++) {
+  const limit = Math.min(MAX_ITERATIONS, Math.max(1, opts.maxIterations || MAX_ITERATIONS));
+  for (let iteration = 0; iteration < limit; iteration++) {
+    opts.signal?.throwIfAborted();
     const toolDefs = registry.definitions();
     let turnText = '';
     let calls: LlmToolCall[] = [];
     let streamError: string | null = null;
 
-    for await (const event of provider.stream({ system: systemPrompt, messages, tools: toolDefs })) {
+    for await (const event of provider.stream({ system: systemPrompt, messages, tools: toolDefs, signal: opts.signal })) {
       if (event.type === 'text') {
         turnText += event.delta;
         emit('token', { text: event.delta });
@@ -142,13 +145,18 @@ export async function runAgentTurn(opts: {
 
         const durationMs = Date.now() - start;
         const summary = summarize(runResult.content);
-        logRepo.add({
+        const entry = {
           tool: name,
           args: JSON.stringify(redactArgs(args)),
           result_summary: summary,
           status: runResult.ok ? 'success' : 'error',
           duration_ms: durationMs,
-        });
+        };
+        if (opts.log) await opts.log(entry);
+        else {
+          const { ToolLogRepository } = await import('../memory/repositories/toolLogRepository');
+          new ToolLogRepository().add(entry);
+        }
         emit('tool_result', { id, name, ok: runResult.ok, summary, durationMs });
         return { id, name, ok: runResult.ok, content: runResult.content };
       }),

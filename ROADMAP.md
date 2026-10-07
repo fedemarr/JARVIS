@@ -131,7 +131,11 @@ claves, bases de datos, sesiones de navegador y archivos privados de tickets.
 Código publicado en https://github.com/fedemarr/JARVIS y primera interfaz
 publicada en https://jarvis-eta-blue.vercel.app el 7 de octubre de 2026.
 El proyecto `jarvis` de `fmcodes-projects` está conectado al repositorio.
-El backend remoto y la autenticación siguen pendientes.
+Backend remoto en preparación: Vercel + Neon Free, sin Render pago. La base
+`jarvis-memory` ya está creada y probada; el código incluye sesión autenticada,
+historial, memoria, tareas y notas. Falta la clave de Claude guardada y la
+verificación del despliegue de ambos servicios. La web actual sigue siendo
+la primera interfaz sin backend.
 
 Referencias: [Vite en Vercel](https://vercel.com/docs/frameworks/frontend/vite)
 y [entornos de funciones](https://vercel.com/docs/functions/runtimes).

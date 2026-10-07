@@ -4,6 +4,8 @@ import { useSpeech } from './hooks/useSpeech';
 import { ChatMessage } from './components/ChatMessage';
 import { Orb } from './components/Orb';
 import { TicketImport } from './components/TicketImport';
+import { apiFetch } from './lib/api';
+import { useAccess } from './components/AccessGate';
 import { MicButton } from './components/MicButton';
 import { ToolCard } from './components/ToolCard';
 import { ConfirmDialog } from './components/ConfirmDialog';
@@ -11,6 +13,7 @@ import { createBrowserVoice } from './lib/browserVoice';
 import { LlmMessage } from '../../shared/llm';
 
 function App() {
+  const access = useAccess();
   const [input, setInput] = useState('');
   const [backendStatus, setBackendStatus] = useState<'checking' | 'connected' | 'offline'>('checking');
   const [providerModel, setProviderModel] = useState('');
@@ -97,7 +100,7 @@ function App() {
   }, [messages]);
 
   useEffect(() => {
-    fetch('/api/health')
+    apiFetch('/api/health')
       .then((r) => { if (!r.ok) throw new Error('Backend unavailable'); return r.json(); })
       .then((data: { provider?: string; model?: string }) => {
         setBackendStatus('connected');
@@ -113,7 +116,7 @@ function App() {
   useEffect(() => {
     if (greetedRef.current) return;
     greetedRef.current = true;
-    fetch('/api/brief')
+    apiFetch('/api/brief')
       .then((r) => { if (!r.ok) throw new Error('Backend unavailable'); return r.json(); })
       .then((data: { date_text?: string; tasks_today?: { title: string }[]; pending_tasks?: { title: string }[] }) => {
         const dateText = data.date_text || '';
@@ -178,6 +181,7 @@ function App() {
           ))}
         </div>
         <div className="operator"><div className="operator-avatar">F</div><div>Federico<small>OPERADOR PRINCIPAL</small></div><span className="operator-dot" /></div>
+        {access.required && <button className="logout-button" onClick={() => void access.logout()} disabled={isLoading}>Cerrar sesión</button>}
       </aside>
 
       <main className="command-main">

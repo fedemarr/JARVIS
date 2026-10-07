@@ -24,6 +24,27 @@ también pasaron. No se subieron claves, bases de datos ni perfiles de navegador
 - Herramientas de PC: agentes instalados en cada computadora, conectados al
   coordinador. Un despliegue web no tiene acceso automático a esas computadoras.
 
+## Backend gratuito preparado
+
+Federico descartó el alojamiento pago. Se creó `jarvis-memory` en Neon,
+exclusivamente en el plan `free_v3`, conectado a la producción del proyecto
+`fmcodes-projects/jarvis`. Los términos de la integración fueron aceptados por
+Federico. El código de nube está en `backend/cloud.ts` y `backend/src/cloud/`;
+usa PostgreSQL sin depender de SQLite local y define el segundo servicio en
+`vercel.json`. No se contrató Render ni se cambió el plan de Vercel.
+
+Se verificaron conversaciones, memorias, tareas y notas contra PostgreSQL real
+entre instancias independientes; las filas ficticias de prueba se eliminaron.
+Las pruebas de autenticación y de herramientas Claude simuladas pasan. Se
+actualizaron Fastify y plugins y npm reportó cero vulnerabilidades.
+
+Pendiente: guardar `ANTHROPIC_API_KEY` en el `.env` local, configurar los secretos
+de producción, probar una llamada pequeña a Claude y desplegar. Federico ya
+autorizó guardar la clave de Anthropic y una nueva clave de acceso como secretos
+solo en `fmcodes-projects/jarvis`. La configuración anterior de Gemini no se envió:
+la revisión automática la rechazó antes de ejecutarla. No se eludió ese bloqueo.
+El despliegue actual continúa siendo la interfaz sin backend mientras falta la clave.
+
 ## Requisitos antes de publicar una versión funcional
 
 1. Implementar autenticación y protección de rutas de chat, memoria y acciones.

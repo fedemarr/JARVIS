@@ -30,3 +30,6 @@ backend/process.exit(0)
 
 .vercel
 .env*
+!.env.example
+.agents/
+skills-lock.json

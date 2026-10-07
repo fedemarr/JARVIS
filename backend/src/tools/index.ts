@@ -75,10 +75,17 @@ export type ToolRegistry = {
   isDangerous(name: string, args: Record<string, unknown>): { dangerous: boolean; reason: string | null };
 };
 
-export function getToolRegistry(): ToolRegistry {
+// Las herramientas de PC se habilitarán mediante agentes de dispositivos.
+const CLOUD_TOOLS = new Set([
+  'get_current_time', 'calculator', 'web_search', 'remember', 'recall', 'forget',
+  'create_task', 'list_tasks', 'complete_task', 'create_note', 'search_notes',
+]);
+
+export function getToolRegistry(mode = process.env.JARVIS_MODE): ToolRegistry {
+  const tools = mode === 'cloud' ? TOOLS.filter((tool) => CLOUD_TOOLS.has(tool.name)) : TOOLS;
   return {
     definitions(): ToolDefinition[] {
-      return TOOLS.map((t) => ({
+      return tools.map((t) => ({
         name: t.name,
         description: t.description,
         schema: zodToJsonSchema(t.schema),
@@ -87,11 +94,11 @@ export function getToolRegistry(): ToolRegistry {
     },
 
     get(name: string): Tool | undefined {
-      return TOOLS.find((t) => t.name === name);
+      return tools.find((t) => t.name === name);
     },
 
     async run(name, args) {
-      const tool = TOOLS.find((t) => t.name === name);
+      const tool = tools.find((t) => t.name === name);
       if (!tool) {
         return { ok: false, content: `Tool desconocida: ${name}` };
       }
@@ -108,7 +115,7 @@ export function getToolRegistry(): ToolRegistry {
     },
 
     isDangerous(name, args) {
-      const tool = TOOLS.find((t) => t.name === name);
+      const tool = tools.find((t) => t.name === name);
       if (!tool) return { dangerous: false, reason: null };
       const reason = tool.dangerReason(args);
       if (reason) return { dangerous: true, reason };

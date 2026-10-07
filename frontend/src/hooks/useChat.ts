@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { LlmMessage } from '../../../shared/llm';
+import { apiFetch } from '../lib/api';
 
 interface Conversation {
   id: string;
@@ -73,7 +74,7 @@ export const useChat = () => {
     setCurrentConversationId(id);
     if (id) {
       try {
-        const response = await fetch(`/api/conversations/${id}`);
+        const response = await apiFetch(`/api/conversations/${id}`);
         if (response.ok) {
           const data: ConversationWithMessages = await response.json();
           setMessages(data.messages || []);
@@ -89,7 +90,7 @@ export const useChat = () => {
 
   const fetchConversations = useCallback(async () => {
     try {
-      const response = await fetch('/api/conversations');
+      const response = await apiFetch('/api/conversations');
       if (response.ok) {
         const data: Conversation[] = await response.json();
         setConversations(data);
@@ -112,7 +113,7 @@ export const useChat = () => {
       let assistantText = '';
 
       try {
-        const response = await fetch('/api/chat', {
+        const response = await apiFetch('/api/chat', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ conversationId, message: text }),
@@ -201,15 +202,16 @@ export const useChat = () => {
 
   const confirmAction = useCallback(async (pendingId: string, approved: boolean) => {
     try {
-      await fetch('/api/confirm', {
+      const response = await apiFetch('/api/confirm', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ pendingId, approved }),
       });
+      if (!response.ok) throw new Error('No se pudo confirmar la acción.');
+      setPendingConfirmations((prev) => prev.filter((c) => c.pendingId !== pendingId));
     } catch (error) {
       console.error('Error confirming:', error);
     }
-    setPendingConfirmations((prev) => prev.filter((c) => c.pendingId !== pendingId));
   }, []);
 
   const addSystemMessage = useCallback((text: string) => {

@@ -19,3 +19,5 @@ artifacts/
 backend/process.exit(0)
 playwright-report/
 test-results/
+.agents/
+skills-lock.json

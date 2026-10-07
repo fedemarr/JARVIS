@@ -63,3 +63,35 @@ body { background: #020817; color: #d6e6ff; }
 @media (max-width: 1200px) { .core-stage { grid-template-columns: minmax(110px, 1fr) minmax(0, 2.5fr); padding: 24px 20px; }.reactor-diagram { width: 330px; height: 330px; }.core-note h2 { font-size: 26px; } }
 @media (max-width: 640px) { .command-sidebar { background: #040d22; }.core-stage { display: flex; flex-direction: column; min-height: 440px; padding: 16px 20px 20px; }.core-note { align-self: stretch; padding: 0; display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 18px; }.core-note > .eyebrow { display: none; }.core-note h2 { font-size: 18px; margin: 0; }.core-note h2 br { display: none; }.core-note p { margin: 0; font-size: 8px; text-align: right; }.reactor-diagram { width: min(290px, calc(100vw - 70px)); height: min(290px, calc(100vw - 70px)); }.reactor-heart { width: 116px; height: 116px; }.reactor-heart span { font-size: 46px; }.core-wordmark { bottom: 18px; font-size: 7px; letter-spacing: 2px; }.orbit-inner { inset: 50px; }.orbit-tracer { inset: 66px; }.reactor-label { font-size: 8px; letter-spacing: .8px; }.access-card { padding: 22px; }.access-card .reactor-diagram { width: min(260px, calc(100vw - 105px)); height: min(260px, calc(100vw - 105px)); } }
 @media (prefers-reduced-motion: reduce) { .reactor-heart, .reactor-orbit, .reactor-sweep { animation: none; } }
+
+.command-shell { grid-template-columns: 200px minmax(0, 1fr); }
+.mission-workspace { display: grid; grid-template-columns: minmax(0, 1fr) minmax(350px, 38%); flex: 1; min-height: 0; }
+.mission-workspace > .main-scroll { min-width: 0; }
+.chat-panel { display: flex; flex-direction: column; min-width: 0; min-height: 0; border-left: 1px solid #3679b955; background: #040e24b3; }
+.chat-panel .conversation-feed { flex: 1; min-height: 0; overflow-y: auto; padding: 24px 22px; }
+.chat-panel .feed-heading { position: sticky; top: -24px; z-index: 2; background: #040e24; padding: 16px 0; }
+.chat-panel .composer-wrap { flex-shrink: 0; padding: 14px 16px; }
+.chat-panel .command-composer { gap: 8px; }
+.chat-panel .composer-footer { flex-wrap: wrap; gap: 8px; }
+.handsfree-controls { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding-top: 12px; }
+.handsfree-toggle { border: 1px solid #3b80b8; background: #0b2344; color: #a9dfff; padding: 7px 9px; border-radius: 3px; font: 10px Consolas, monospace; }
+.handsfree-active { border-color: #53d2ff; box-shadow: 0 0 12px #209fff33; color: #d4f6ff; }
+.handsfree-controls > span, .voice-notice { font-size: 9px; color: #89abc9; line-height: 1.5; }
+.voice-notice { color: #ffc194; }
+.mission-workspace .core-stage { grid-template-columns: minmax(0, 1fr); justify-items: center; gap: 24px; padding: 24px; }
+.mission-workspace .core-note { justify-self: stretch; display: flex; align-items: center; justify-content: space-between; padding: 0; gap: 12px; }
+.mission-workspace .core-note > .eyebrow { display: none; }
+.mission-workspace .core-note h2 { font-size: 23px; margin: 0; }
+.mission-workspace .core-note h2 br { display: none; }
+.mission-workspace .core-note h2 span { margin-left: .25em; }
+.mission-workspace .core-note p { margin: 0; font-size: 9px; text-align: right; }
+.mission-workspace .core-telemetry { display: flex; justify-self: stretch; width: auto; justify-content: center; gap: 24px; margin: 0; }
+.mission-workspace .core-telemetry > .eyebrow { display: none; }
+.mission-workspace .core-telemetry > div { gap: 12px; }
+.mission-workspace .mission-shortcuts { padding: 22px; }
+.mission-workspace .context-sidebar { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; padding: 0 22px 22px; border: 0; background: transparent; }
+.mission-workspace .context-heading, .mission-workspace .context-footnote { display: none; }
+.mission-workspace .context-panel { margin: 0; }
+.mission-workspace .priority-panel { grid-row: span 2; }
+@media (max-width: 1100px) { .command-shell { grid-template-columns: 175px minmax(0, 1fr); }.mission-workspace { grid-template-columns: minmax(0, 1fr) minmax(320px, 43%); }.mission-workspace .reactor-diagram { width: min(310px, 100%); aspect-ratio: 1; height: auto; }.mission-workspace .core-note h2 { font-size: 20px; }.mission-workspace .core-note p { display: none; }.mission-workspace .core-telemetry { gap: 12px; }.mission-workspace .core-telemetry > div { flex-direction: column; font-size: 8px; }.mission-workspace .mission-shortcuts, .mission-workspace .context-sidebar { grid-template-columns: 1fr; }.mission-workspace .mission-shortcuts small { display: none; } }
+@media (max-width: 760px) { .command-shell { display: flex; flex-direction: column; }.command-sidebar { flex-direction: row; align-items: center; justify-content: space-between; padding: 12px 16px; flex-shrink: 0; }.command-sidebar .brand { margin: 0; }.command-sidebar .sidebar-section-label, .command-sidebar .conversation-list, .command-sidebar .operator, .command-sidebar .nav-item:not(.nav-active) { display: none; }.command-sidebar .nav-active { width: auto; margin: 0; }.mission-workspace { display: flex; flex-direction: column; overflow-y: auto; }.mission-workspace > .main-scroll { flex: none; overflow: visible; }.chat-panel { flex: 1 0 420px; border-left: 0; border-top: 1px solid #3679b955; }.chat-panel .conversation-feed { min-height: 180px; }.mission-workspace .core-stage { min-height: 0; }.mission-workspace .core-telemetry, .mission-workspace .context-sidebar { display: none; }.mission-workspace .reactor-diagram { width: min(290px, calc(100vw - 70px)); }.mission-workspace .mission-shortcuts { grid-template-columns: 1fr 1fr; }.mission-workspace .core-note p { display: block; }.chat-panel .composer-wrap { position: sticky; bottom: 0; z-index: 3; } }

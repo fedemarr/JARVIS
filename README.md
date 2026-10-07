@@ -71,6 +71,19 @@ en el selector. Las respuestas se leen completas en una cola de segmentos cortos
 un fragmento nuevo no corta el anterior. Silenciar o iniciar otra misión detiene
 la lectura. El núcleo azul tiene anillos giratorios y barrido circular, respetando
 la preferencia del dispositivo para reducir movimiento.
+En escritorio, el chat y sus controles están a la derecha del núcleo. En el
+celular se apilan para mantener el editor legible.
+
+**Manos libres:** activá el botón, concedé permiso al micrófono y decí «Jarvis».
+Responde «Te escucho, Federico. ¿Qué necesitás?» y escucha tu pedido. También
+podés decir «Jarvis, ayudame a estudiar» directamente. Después de cada respuesta
+completa vuelve a escucharte, sin repetir su nombre. Decí «descansá» o «dormí»
+para volver a esperar la palabra Jarvis, o desactivá el botón para detener el
+micrófono. No escucha mientras habla. La función requiere una web abierta y
+reconocimiento de voz disponible en el navegador; no es una activación global
+del sistema operativo. El permiso del micrófono debe concederlo el usuario.
+Las pruebas automatizadas simulan reconocimiento y audio: falta verificar el
+micrófono y el reconocimiento real en el equipo de Federico.
 En la nube están disponibles memoria, tareas, notas y análisis
 de tickets; el control de computadoras y la conexión con Claude Code siguen pendientes.
 

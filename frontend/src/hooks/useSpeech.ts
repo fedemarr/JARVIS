@@ -45,6 +45,14 @@ export function useSpeech({ stt, tts, onCommand }: UseSpeechOptions) {
     tts.onEnd(() => {
       setOrbState((s) => (s === 'SPEAKING' ? 'IDLE' : s));
     });
+    return () => {
+      stt.onIntermediate(() => {});
+      stt.onFinal(() => {});
+      stt.onEnd(() => {});
+      tts.onEnd(() => {});
+      stt.abort();
+      tts.cancel();
+    };
   }, [stt, tts]);
 
   const startListening = useCallback(() => {
@@ -58,6 +66,13 @@ export function useSpeech({ stt, tts, onCommand }: UseSpeechOptions) {
 
   const stopListening = useCallback(() => {
     stt.stop();
+  }, [stt]);
+
+  const abortListening = useCallback(() => {
+    listeningRef.current = false;
+    setPartialTranscript('');
+    stt.abort();
+    setOrbState((state) => state === 'LISTENING' ? 'IDLE' : state);
   }, [stt]);
 
   const speak = useCallback(
@@ -112,6 +127,7 @@ export function useSpeech({ stt, tts, onCommand }: UseSpeechOptions) {
     changeVoice,
     startListening,
     stopListening,
+    abortListening,
     speak,
     cancelSpeaking,
     toggleMute,

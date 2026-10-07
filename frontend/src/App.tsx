@@ -16,6 +16,9 @@ function App() {
   const access = useAccess();
   const [input, setInput] = useState('');
   const [coreGreeting, setCoreGreeting] = useState('');
+  const [handsFree, setHandsFree] = useState(false);
+  const [voiceAwake, setVoiceAwake] = useState(false);
+  const [voiceNotice, setVoiceNotice] = useState('');
   const [backendStatus, setBackendStatus] = useState<'checking' | 'connected' | 'offline'>('checking');
   const [providerModel, setProviderModel] = useState('');
   const {
@@ -37,7 +40,23 @@ function App() {
   const speech = useSpeech({
     stt: voice.stt,
     tts: voice.tts,
-    onCommand: (text) => void commandRef.current(text),
+    onCommand: (text) => {
+      if (isLoading) return;
+      if (!handsFree) { void commandRef.current(text); return; }
+      const wake = text.match(/\b(?:jarvis|y arvis|yarvis)\b[\s,.:;!?¿¡]*(.*)/i);
+      if (!voiceAwake && !wake) { speech.setOrbState('IDLE'); return; }
+      const command = (wake ? wake[1] : text).trim();
+      setVoiceAwake(true);
+      if (!command) {
+        const greeting = 'Te escucho, Federico. ¿Qué necesitás?';
+        setCoreGreeting(greeting);
+        speech.speak(greeting, true);
+      } else if (/^(?:gracias[,. ]*)?(?:dorm[ií]|descans[aá]|hasta luego|terminar conversación)[.! ]*$/i.test(command)) {
+        setVoiceAwake(false);
+        setCoreGreeting('Cuando me necesites, decí Jarvis.');
+        speech.speak('Cuando me necesites, decí Jarvis.', true);
+      } else void commandRef.current(command);
+    },
   });
 
   const pendingSpeechRef = useRef('');
@@ -87,6 +106,7 @@ function App() {
   commandRef.current = async (text: string) => {
     setInput('');
     setCoreGreeting('');
+    speech.abortListening();
     speech.cancelSpeaking();
     speech.setThinking();
     pendingSpeechRef.current = '';
@@ -99,10 +119,23 @@ function App() {
   };
 
   useEffect(() => {
-    const feed = messagesEndRef.current?.closest('.main-scroll');
+    const feed = messagesEndRef.current?.closest('.conversation-feed');
     if (!messages.some((message) => message.role === 'user')) feed?.scrollTo({ top: 0 });
     else messagesEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
   }, [messages]);
+
+  useEffect(() => {
+    if (!handsFree || isLoading) return;
+    if (speech.orbState === 'ERROR') {
+      setHandsFree(false);
+      setVoiceAwake(false);
+      setVoiceNotice('No pude usar el micrófono. Revisá el permiso y activá manos libres de nuevo.');
+      return;
+    }
+    if (speech.orbState !== 'IDLE') return;
+    const timer = setTimeout(speech.startListening, 350);
+    return () => clearTimeout(timer);
+  }, [handsFree, isLoading, speech.orbState, speech.startListening]);
 
   useEffect(() => {
     apiFetch('/api/health')
@@ -149,6 +182,7 @@ function App() {
     if (!text || isLoading) return;
     setInput('');
     setCoreGreeting('');
+    speech.abortListening();
     speech.cancelSpeaking();
     speech.setThinking();
     pendingSpeechRef.current = '';
@@ -164,6 +198,8 @@ function App() {
     setInput('');
     setCoreGreeting('');
     speech.cancelSpeaking();
+    speech.abortListening();
+    setVoiceAwake(false);
     selectConversation(undefined);
   };
 
@@ -197,11 +233,14 @@ function App() {
           <div><span className="eyebrow">JARVIS / CONTROL CENTRAL</span><h1>Tu inteligencia. En acción.</h1></div>
           <div className={`connection-chip connection-${backendStatus}`}><span />{backendStatus === 'connected' ? 'BACKEND CONECTADO' : backendStatus === 'checking' ? 'CONECTANDO' : 'SIN CONEXIÓN'}</div>
         </header>
+        <div className="mission-workspace">
         <div className="main-scroll">
           <section className="core-stage" aria-label="Estado del asistente">
             <div className="core-note"><span className="eyebrow">ASISTENTE PERSONAL</span><h2>Bienvenido,<br /><span>Federico.</span></h2><p>Una misión a la vez.<br />Construyamos lo que sigue.</p></div>
-            <Orb state={speech.orbState === 'SPEAKING' ? 'SPEAKING' : isLoading ? 'THINKING' : speech.orbState} disabled={isLoading || speech.orbState === 'LISTENING'} greeting={coreGreeting && speech.orbState === 'SPEAKING' ? coreGreeting : undefined} onActivate={() => {
+            <Orb state={speech.orbState === 'SPEAKING' ? 'SPEAKING' : isLoading ? 'THINKING' : speech.orbState} disabled={isLoading} greeting={coreGreeting && speech.orbState === 'SPEAKING' ? coreGreeting : undefined} onActivate={() => {
               const greeting = 'Buenas, Federico. ¿En qué puedo ayudarte?';
+              speech.abortListening();
+              setVoiceAwake(handsFree);
               setCoreGreeting(greeting);
               speech.cancelSpeaking();
               speech.speak(greeting, true);
@@ -215,6 +254,15 @@ function App() {
             <button disabled={isLoading} onClick={() => setInput('Revisá mis tareas pendientes y ayudame a elegir las prioridades de hoy.')}><span className="shortcut-icon">◎</span><div><strong>Organizar mi día</strong><small>Tareas · enfoque y próximos pasos</small></div><span>↗</span></button>
           </section>
 
+      <aside className="context-sidebar">
+        <div className="eyebrow context-heading">CONTEXTO OPERATIVO <span>◈</span></div>
+        <section className="context-panel priority-panel"><span className="eyebrow">MISIÓN PRIORITARIA</span><div className="project-emblem">O<span>ERP</span></div><h2>OhlimpiaERP</h2><p>De un ticket a una solución<br />con estructura y criterio.</p><div className="context-divider" /><ol className="workflow-steps"><li><span>01</span> Importar .md o .html</li><li><span>02</span> Revisar contexto y código</li><li><span>03</span> Resolver y probar</li><li><span>04</span> Revisar y aceptar</li></ol><small className="panel-note">Importación manual disponible. Integración con la nube pendiente.</small></section>
+        <section className="context-panel"><span className="eyebrow">DISPOSITIVOS</span><div className="device-row"><span className="device-symbol">▣</span><div>Esta computadora<small>Interfaz local</small></div><span className="device-tag">LOCAL</span></div><div className="device-row device-pending"><span className="device-symbol">▣</span><div>Computadora de casa<small>Vinculación pendiente</small></div></div></section>
+        <section className="context-panel model-panel"><span className="eyebrow">MOTOR DE INTELIGENCIA</span><p>{providerModel || 'Sin información del backend'}</p><small>La conexión con el modelo se verifica al enviar una misión.</small></section>
+        <div className="context-footnote"><span>JARVIS</span> EN CONSTANTE EVOLUCIÓN</div>
+      </aside>
+        </div>
+        <div className="chat-panel">
           <section className="conversation-feed" aria-label="Conversación">
             <div className="feed-heading"><span className="eyebrow">CANAL DE COMUNICACIÓN</span><span>{isLoading ? 'PROCESANDO' : 'CHAT + VOZ'}</span></div>
             {messages.length === 0 && <div className="empty-transmission"><span>◈</span><h3>¿Cuál es la misión?</h3><p>Importá un ticket, compartí una idea o hablame.<br />Estoy listo para ayudarte a darle forma.</p></div>}
@@ -223,29 +271,32 @@ function App() {
             {toolCards.length > 0 && <div className="tool-feed">{toolCards.map((card) => <ToolCard key={card.id} card={card} />)}</div>}
             <div ref={messagesEndRef} />
           </section>
-        </div>
-
         <div className="composer-wrap">
           <TicketImport onImport={setInput} disabled={isLoading} />
           <form onSubmit={handleSendText} className="command-composer">
-            <MicButton listening={speech.orbState === 'LISTENING'} supported={speech.sttSupported} onStart={speech.startListening} onStop={speech.stopListening} />
+            <MicButton listening={speech.orbState === 'LISTENING'} supported={speech.sttSupported} onStart={() => { setHandsFree(false); setVoiceAwake(false); speech.startListening(); }} onStop={speech.stopListening} />
             <textarea aria-label="Mensaje para Jarvis" rows={2} value={inputValue} onChange={(e) => setInput(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) { e.preventDefault(); e.currentTarget.form?.requestSubmit(); } }} placeholder={speech.orbState === 'LISTENING' ? 'Te escucho…' : 'Escribí tu próxima misión…'} />
             <button type="button" onClick={speech.toggleMute} aria-label={speech.isMuted ? 'Activar voz' : 'Silenciar voz'} title={speech.isMuted ? 'Activar voz' : 'Silenciar voz'} className="voice-toggle">{speech.isMuted ? <MutedIcon /> : <SpeakerIcon />}</button>
             <button type="submit" disabled={isLoading || !input.trim()} className="send-button" aria-label="Enviar mensaje">↗</button>
           </form>
+          <div className="handsfree-controls">
+            <button type="button" className={handsFree ? 'handsfree-toggle handsfree-active' : 'handsfree-toggle'} aria-pressed={handsFree} disabled={!speech.sttSupported || !speech.ttsSupported || (!handsFree && isLoading)} onClick={() => {
+              setVoiceNotice('');
+              setVoiceAwake(false);
+              if (handsFree) { setHandsFree(false); speech.abortListening(); }
+              else { setHandsFree(true); speech.startListening(); }
+            }}>{handsFree ? 'Desactivar manos libres' : 'Activar manos libres'}</button>
+            <span role="status">{handsFree ? voiceAwake ? 'Conversación activa · te escucho al terminar de hablar' : 'Decí «Jarvis» para llamarme' : !speech.sttSupported ? 'Reconocimiento de voz no disponible en este navegador' : 'Activá el micrófono una vez y después decí «Jarvis»'}</span>
+          </div>
+          {voiceNotice && <p className="voice-notice" role="alert">{voiceNotice}</p>}
           <div className="composer-footer"><span>ENTER para enviar · SHIFT + ENTER para nueva línea</span>
             {speech.ttsSupported && speech.voices.length > 0 && <select aria-label="Voz de Jarvis" value={speech.selectedVoice ?? ''} onChange={(e) => speech.changeVoice(e.target.value)}><option value="">Voz automática · es-AR</option>{speech.voices.map((v) => <option key={v.voiceURI} value={v.voiceURI}>{v.name} ({v.lang})</option>)}</select>}
           </div>
         </div>
+        </div>
+        </div>
       </main>
 
-      <aside className="context-sidebar">
-        <div className="eyebrow context-heading">CONTEXTO OPERATIVO <span>◈</span></div>
-        <section className="context-panel priority-panel"><span className="eyebrow">MISIÓN PRIORITARIA</span><div className="project-emblem">O<span>ERP</span></div><h2>OhlimpiaERP</h2><p>De un ticket a una solución<br />con estructura y criterio.</p><div className="context-divider" /><ol className="workflow-steps"><li><span>01</span> Importar .md o .html</li><li><span>02</span> Revisar contexto y código</li><li><span>03</span> Resolver y probar</li><li><span>04</span> Revisar y aceptar</li></ol><small className="panel-note">Importación manual disponible. Integración con la nube pendiente.</small></section>
-        <section className="context-panel"><span className="eyebrow">DISPOSITIVOS</span><div className="device-row"><span className="device-symbol">▣</span><div>Esta computadora<small>Interfaz local</small></div><span className="device-tag">LOCAL</span></div><div className="device-row device-pending"><span className="device-symbol">▣</span><div>Computadora de casa<small>Vinculación pendiente</small></div></div></section>
-        <section className="context-panel model-panel"><span className="eyebrow">MOTOR DE INTELIGENCIA</span><p>{providerModel || 'Sin información del backend'}</p><small>La conexión con el modelo se verifica al enviar una misión.</small></section>
-        <div className="context-footnote"><span>JARVIS</span> EN CONSTANTE EVOLUCIÓN</div>
-      </aside>
       <ConfirmDialog pending={pendingConfirmations} onConfirm={confirmAction} />
     </div>
   );

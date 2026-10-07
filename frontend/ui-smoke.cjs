@@ -8,6 +8,7 @@ const { chromium } = require('playwright');
 const dist = path.join(__dirname, 'dist');
 const artifacts = path.join(__dirname, '..', 'artifacts');
 let submitted;
+let requestCount = 0;
 const replyParts = ['Análisis de prueba completado. Esta es la primera parte de una respuesta larga. ', 'La segunda parte también debe escucharse completa y sin interrupciones. ', 'Fin de la respuesta.'];
 const server = http.createServer((req, res) => {
   res.setHeader('Content-Type', 'application/json');
@@ -20,6 +21,7 @@ const server = http.createServer((req, res) => {
     req.on('data', (chunk) => { body += chunk; });
     req.on('end', () => {
       submitted = JSON.parse(body);
+      requestCount++;
       res.setHeader('Content-Type', 'text/event-stream');
       res.end(replyParts.map(text => `event: token\ndata: ${JSON.stringify({text})}\n\n`).join('') + 'event: done\ndata: {}\n\n');
     });
@@ -45,6 +47,20 @@ async function run() {
     page.on('pageerror', (error) => errors.push(error.message));
     await page.addInitScript(() => {
       window.spoken = [];
+      window.recognitionStarts = 0;
+      window.webkitSpeechRecognition = class {
+        start() { window.recognitionStarts++; window.lastRecognition = this; this.active = true; }
+        stop() { this.active = false; this.onend?.(); }
+        abort() { this.active = false; this.onend?.(); }
+      };
+      window.say = (text) => {
+        const recognition = window.lastRecognition;
+        if (!recognition?.active) throw new Error('El micrófono no está activo');
+        const result = [{ transcript: text }]; result.isFinal = true;
+        recognition.onresult({ resultIndex: 0, results: [result] });
+        recognition.active = false;
+        recognition.onend();
+      };
       Object.defineProperty(window, 'speechSynthesis', { value: {
         getVoices: () => [], addEventListener() {}, removeEventListener() {}, cancel() {},
         speak(utterance) { window.spoken.push(utterance.text); window.lastUtterance = utterance; },
@@ -52,6 +68,9 @@ async function run() {
     });
     await page.goto(`http://127.0.0.1:${server.address().port}`);
     await page.getByText('BACKEND CONECTADO', { exact: true }).waitFor();
+    const coreBounds = await page.getByRole('region', { name: 'Estado del asistente' }).boundingBox();
+    const chatBounds = await page.getByRole('region', { name: 'Conversación' }).boundingBox();
+    assert(chatBounds.x >= coreBounds.x + coreBounds.width, 'Chat al costado del núcleo');
     const core = page.getByRole('button', { name: 'Saludar a Jarvis' });
     await core.focus();
     await core.press('Enter');
@@ -98,6 +117,50 @@ async function run() {
     await page.getByRole('button', { name: 'Nueva misión' }).click();
     await page.getByText('¿Cuál es la misión?').waitFor();
     assert.equal(await textarea.inputValue(), '');
+    await page.getByRole('button', { name: 'Activar manos libres' }).click();
+    await page.waitForFunction(() => window.lastRecognition?.active);
+    await page.evaluate(() => window.say('hola'));
+    await page.waitForFunction(() => window.recognitionStarts === 2);
+    assert.equal(requestCount, 1, 'Sin llamada al modelo antes de decir Jarvis');
+    await page.evaluate(() => window.say('Jarvis'));
+    await page.waitForFunction(() => window.spoken.length === 6);
+    assert.equal(await page.evaluate(() => window.spoken[5]), 'Te escucho, Federico. ¿Qué necesitás?');
+    assert.equal(await page.evaluate(() => window.lastRecognition.active), false, 'No escuchar su propia voz');
+    await page.evaluate(() => window.lastUtterance.onend());
+    await page.waitForFunction(() => window.recognitionStarts === 3);
+    await page.evaluate(() => window.say('ayudame a estudiar'));
+    await page.getByText(replyParts.join(''), { exact: true }).waitFor();
+    assert.equal(submitted.message, 'ayudame a estudiar');
+    await page.waitForFunction(() => window.spoken.length === 7);
+    for (let i = 0; i < replyParts.length; i++) {
+      await page.evaluate(() => window.lastUtterance.onend());
+      if (i < replyParts.length - 1) await page.waitForFunction(n => window.spoken.length === n, i + 8);
+    }
+    await page.waitForFunction(() => window.recognitionStarts === 4);
+    await page.evaluate(() => window.say('dormí'));
+    await page.getByText('Decí «Jarvis» para llamarme', { exact: true }).waitFor();
+    await page.waitForFunction(() => window.spoken.length === 10);
+    await page.evaluate(() => window.lastUtterance.onend());
+    await page.waitForFunction(() => window.recognitionStarts === 5);
+    await page.evaluate(() => window.say('Jarvis organiza mi día'));
+    await page.waitForFunction(() => window.spoken.length === 11);
+    assert.equal(submitted.message, 'organiza mi día');
+    await page.getByRole('button', { name: 'Desactivar manos libres' }).click();
+    for (let i = 0; i < replyParts.length; i++) {
+      await page.evaluate(() => window.lastUtterance.onend());
+      if (i < replyParts.length - 1) await page.waitForFunction(n => window.spoken.length === n, i + 12);
+    }
+    await page.getByRole('button', { name: 'Activar manos libres' }).waitFor();
+    await page.getByRole('button', { name: 'Activar manos libres' }).click();
+    await page.waitForFunction(() => window.recognitionStarts === 6);
+    await page.evaluate(() => {
+      const recognition = window.lastRecognition;
+      recognition.onerror({ error: 'not-allowed' });
+      recognition.onend?.();
+    });
+    await page.getByRole('alert').filter({ hasText: 'No pude usar el micrófono' }).waitFor();
+    await page.getByRole('button', { name: 'Activar manos libres' }).waitFor();
+    await page.getByRole('button', { name: 'Nueva misión' }).click();
     fs.mkdirSync(artifacts, { recursive: true });
     await page.screenshot({ path: path.join(artifacts, 'jarvis-desktop.png'), fullPage: true });
     await page.setViewportSize({ width: 390, height: 844 });
@@ -106,7 +169,7 @@ async function run() {
     assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth), false, 'Sin desborde horizontal en móvil');
     await page.screenshot({ path: path.join(artifacts, 'jarvis-mobile.png'), fullPage: true });
     assert.deepEqual(errors, []);
-    console.log('PASS: saludo, lectura completa en orden, historial, importación MD/HTML, envío, límites y vista móvil. API simulada.');
+    console.log('PASS: chat lateral, saludo, lectura completa, activación Jarvis, conversación manos libres sin eco, apagado, importación y móvil. API y micrófono simulados.');
   } finally {
     if (browser) await browser.close();
     await new Promise((resolve) => server.close(resolve));

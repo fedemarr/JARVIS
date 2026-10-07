@@ -27,6 +27,7 @@ class BrowserStt implements SttProvider {
     this.finalTranscript = '';
 
     recognition.onresult = (event: SpeechRecognitionEvent) => {
+      if (this.recognition !== recognition) return;
       let interim = '';
       for (let i = event.resultIndex; i < event.results.length; i++) {
         const result = event.results[i];
@@ -43,6 +44,7 @@ class BrowserStt implements SttProvider {
     };
 
     recognition.onerror = (event: SpeechRecognitionErrorEvent) => {
+      if (this.recognition !== recognition) return;
       if (event.error === 'no-speech') {
         this.onEndCb('no-speech');
       } else if (event.error === 'aborted') {
@@ -54,6 +56,7 @@ class BrowserStt implements SttProvider {
     };
 
     recognition.onend = () => {
+      if (this.recognition !== recognition) return;
       const hasFinal = this.finalTranscript.length > 0;
       if (hasFinal) {
         this.onFinalCb(this.finalTranscript);
@@ -69,6 +72,7 @@ class BrowserStt implements SttProvider {
       recognition.start();
     } catch {
       this.cleanup();
+      this.onEndCb('error');
     }
   }
 
@@ -79,9 +83,15 @@ class BrowserStt implements SttProvider {
   }
 
   abort(): void {
-    if (this.recognition) {
-      this.recognition.abort();
-    }
+    const recognition = this.recognition;
+    this.cleanup();
+    this.finalTranscript = '';
+    if (!recognition) return;
+    recognition.onresult = null;
+    recognition.onerror = null;
+    recognition.onend = null;
+    recognition.abort();
+    this.onEndCb('aborted');
   }
 
   onIntermediate(cb: (text: string) => void): void {

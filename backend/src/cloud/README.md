@@ -1,6 +1,8 @@
 # Backend de nube
 
-Entrada de Vercel: `backend/cloud.ts`. La versión local sigue usando
+Entrada de Vercel: `api/index.ts`, que espera a Fastify y delega la solicitud
+a su servidor HTTP. `backend/cloud.ts` permite ejecutar la nube como un servidor
+Node independiente. La versión local sigue usando
 `backend/src/server.ts` y SQLite. La nube usa Fastify y PostgreSQL por HTTP
 con Neon Free; no necesita un disco local ni una cuenta de Render.
 

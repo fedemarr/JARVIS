@@ -128,7 +128,10 @@ Antes de publicar, implementar autenticación, conexión del frontend al backend
 y manejo de sesiones y confirmaciones para acceso remoto. Excluir del repositorio
 claves, bases de datos, sesiones de navegador y archivos privados de tickets.
 
-No se ha creado un repositorio remoto ni realizado un despliegue.
+Código publicado en https://github.com/fedemarr/JARVIS y primera interfaz
+publicada en https://jarvis-eta-blue.vercel.app el 7 de octubre de 2026.
+El proyecto `jarvis` de `fmcodes-projects` está conectado al repositorio.
+El backend remoto y la autenticación siguen pendientes.
 
 Referencias: [Vite en Vercel](https://vercel.com/docs/frameworks/frontend/vite)
 y [entornos de funciones](https://vercel.com/docs/functions/runtimes).

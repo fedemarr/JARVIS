@@ -4,14 +4,17 @@ Repositorio elegido: https://github.com/fedemarr/JARVIS
 
 ## Estado
 
-El 7 de octubre de 2026, `git ls-remote` pudo consultar el repositorio y no
-devolvió referencias: todavía no hay ramas publicadas. La aplicación local
-compila y tiene pruebas de interfaz con una API simulada. No está desplegada.
+El 7 de octubre de 2026 se publicó el código en la rama `main` del repositorio
+y se creó el proyecto `jarvis` en el equipo `fmcodes-projects`, conectado a GitHub.
+La interfaz está publicada en https://jarvis-eta-blue.vercel.app.
+El backend remoto todavía no está conectado: el chat no responde en esta versión.
 La carpeta local está vinculada a ese repositorio como `origin`.
-
-Equipo de Vercel elegido: `fmcodes-projects`. La sesión de CLI permite consultarlo;
-en la consulta del 7 de octubre de 2026 no existe todavía un proyecto `jarvis`.
 El proyecto existente `ohlimpiaerp` es independiente de este despliegue.
+
+Verificación: despliegue READY; navegador contra el enlace público con respuesta
+HTTP 200, importación de un ticket ficticio .md, estado sin backend y vista móvil
+sin desborde horizontal. La compilación y las pruebas locales con API simulada
+también pasaron. No se subieron claves, bases de datos ni perfiles de navegador.
 
 ## Distribución prevista
 

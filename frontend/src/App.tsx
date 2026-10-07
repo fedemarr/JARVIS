@@ -4,6 +4,7 @@ import { useSpeech } from './hooks/useSpeech';
 import { ChatMessage } from './components/ChatMessage';
 import { Orb } from './components/Orb';
 import { TicketImport } from './components/TicketImport';
+import { DesktopPanel } from './components/DesktopPanel';
 import { apiFetch } from './lib/api';
 import { useAccess } from './components/AccessGate';
 import { MicButton } from './components/MicButton';
@@ -272,6 +273,7 @@ function App() {
             <div ref={messagesEndRef} />
           </section>
         <div className="composer-wrap">
+          <DesktopPanel onImport={setInput} disabled={isLoading} />
           <TicketImport onImport={setInput} disabled={isLoading} />
           <form onSubmit={handleSendText} className="command-composer">
             <MicButton listening={speech.orbState === 'LISTENING'} supported={speech.sttSupported} onStart={() => { setHandsFree(false); setVoiceAwake(false); speech.startListening(); }} onStop={speech.stopListening} />

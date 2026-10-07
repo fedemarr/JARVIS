@@ -27,6 +27,14 @@ y animación. Se verificaron respuesta real, persistencia tras recargar y acceso
 desde una vista móvil; el control de PC y la integración de OhlimpiaERP siguen pendientes.
 Actualizar Vite/Tailwind y sus dependencias de desarrollo en una iteración aparte.
 
+Nuevo avance local: agente dedicado en `127.0.0.1:3002`, con sesión privada,
+proyectos explícitos, lectura protegida de texto y Git con argumentos fijos.
+La interfaz permite revisar contexto antes de enviarlo a Claude por HTTPS.
+Kokoro ONNX con voz Alex en español corre en CPU; se comprobó generación de WAV
+y reproducción desde la J. Se verificaron Git de OhlimpiaERP, bloqueo de secretos
+y respuesta real por el proxy. No hay todavía vinculación remota del celular,
+trabajos persistentes, cambios automáticos ni ejecución de Claude Code/Codex.
+
 Prioridad confirmada por Federico: resolver tickets del trabajo. Luego ampliar
 a desarrollo, vida social, estudio y marketing de su empresa.
 

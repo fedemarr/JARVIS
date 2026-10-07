@@ -120,6 +120,8 @@ class BrowserTts implements TtsProvider {
   private generation = 0;
   private queue: string[] = [];
   private currentUtterance: SpeechSynthesisUtterance | null = null;
+  private localSpeech: { controller: AbortController; audio: HTMLAudioElement | null; url: string | null } | null = null;
+  private readonly localDesktop = ['localhost','127.0.0.1'].includes(window.location.hostname) && window.location.port === '3002';
 
   speak(text: string): void {
     if (!this.supported || this.muted || !text.trim()) return;
@@ -135,10 +137,49 @@ class BrowserTts implements TtsProvider {
   }
 
   private speakNext(): void {
-    if (this.currentUtterance || this.pendingSpeech !== undefined || this.muted) return;
+    if (this.currentUtterance || this.localSpeech || this.pendingSpeech !== undefined || this.muted) return;
     const text = this.queue.shift();
     if (!text) return;
     const generation = this.generation;
+    if (this.localDesktop && (this.selectedVoiceURI === null || this.selectedVoiceURI === 'kokoro:em_alex')) {
+      void this.speakLocal(text, generation);
+      return;
+    }
+    this.speakBrowser(text, generation);
+  }
+
+  private async speakLocal(text: string, generation: number): Promise<void> {
+    const local = { controller:new AbortController(), audio:null as HTMLAudioElement | null, url:null as string | null };
+    this.localSpeech = local;
+    const timer = setTimeout(() => local.controller.abort(), 50000);
+    const cleanup = () => {
+      clearTimeout(timer);
+      if (local.url) { URL.revokeObjectURL(local.url); local.url = null; }
+      if (this.localSpeech === local) this.localSpeech = null;
+    };
+    try {
+      const response = await fetch('/api/voice/synthesize', {method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json'},body:JSON.stringify({text}),signal:local.controller.signal});
+      if (!response.ok) throw new Error('Voz local no disponible');
+      const blob = await response.blob();
+      if (generation !== this.generation) {cleanup();return;}
+      local.url = URL.createObjectURL(blob);
+      const audio = new Audio(local.url); local.audio = audio;
+      const finish = () => {
+        cleanup();
+        if (generation !== this.generation) return;
+        if (this.queue.length) this.speakNext(); else this.onEndCb();
+      };
+      audio.onended = finish;
+      audio.onerror = () => {cleanup();if (generation === this.generation) this.speakBrowser(text,generation);};
+      clearTimeout(timer);
+      await audio.play();
+    } catch {
+      cleanup();
+      if (generation === this.generation && !this.muted) this.speakBrowser(text,generation);
+    }
+  }
+
+  private speakBrowser(text: string, generation: number): void {
     const utterance = new SpeechSynthesisUtterance(text);
     this.currentUtterance = utterance;
     utterance.lang = 'es-AR';
@@ -164,6 +205,9 @@ class BrowserTts implements TtsProvider {
     this.generation++;
     this.queue = [];
     this.currentUtterance = null;
+    const local = this.localSpeech;
+    this.localSpeech = null;
+    if (local) { local.controller.abort(); if (local.audio) {local.audio.onended = null;local.audio.onerror = null;local.audio.pause();} if (local.url) URL.revokeObjectURL(local.url); }
     if (this.pendingSpeech !== undefined) { clearTimeout(this.pendingSpeech); this.pendingSpeech = undefined; }
     if (this.supported) {
       speechSynthesis.cancel();
@@ -186,12 +230,14 @@ class BrowserTts implements TtsProvider {
   listVoices(): TtsVoice[] {
     if (!this.supported) return [];
     const voices = speechSynthesis.getVoices();
-    return voices.map((v) => ({
+    const listed: TtsVoice[] = voices.map((v) => ({
       voiceURI: v.voiceURI,
       name: v.name,
       lang: v.lang,
       default: v.default,
     }));
+    if (this.localDesktop) listed.unshift({voiceURI:'kokoro:em_alex',name:'Alex · voz natural en esta PC',lang:'es'});
+    return listed;
   }
 
   getSelectedVoice(): string | null {
@@ -211,6 +257,8 @@ class BrowserTts implements TtsProvider {
     }
     const esVoices = voices.filter((v) => v.lang.toLowerCase().startsWith('es'));
     if (esVoices.length === 0) return null;
+    const natural = esVoices.find((v) => /natural|neural|online/i.test(v.name));
+    if (natural) return natural;
     // Preferir voces masculinas por nombre (lista de nombres de varón comunes por idioma).
     const maleNames = [
       'pablo', 'andres', 'andrés', 'david', 'jorge', 'miguel', 'jose', 'josé',

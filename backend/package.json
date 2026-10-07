@@ -4,13 +4,14 @@
   "private": true,
   "main": "dist/backend/src/server.js",
   "scripts": {
+    "desktop": "tsx src/desktop/start.ts",
     "dev": "tsx watch src/server.ts",
     "build": "tsc -p tsconfig.json && node -e \"require('fs').copyFileSync('src/memory/schema.sql','dist/backend/src/memory/schema.sql')\"",
     "start": "node dist/backend/src/server.js",
     "llm:test": "tsx src/llm/test.ts",
     "n8n:test": "tsx src/n8n/test.ts",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "test": "tsx --test src/cloud/backend.test.ts"
+    "test": "tsx --test src/cloud/backend.test.ts src/desktop/desktop.test.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.39.0",

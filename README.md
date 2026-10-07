@@ -10,6 +10,19 @@ El backend escucha en `127.0.0.1` por defecto; `HOST` configura esa dirección.
 La versión publicada tiene acceso privado y memoria PostgreSQL en Neon.
 La conexión entre computadoras sigue pendiente. Ver [DEPLOYMENT.md](DEPLOYMENT.md).
 
+### Jarvis Desktop y voz natural
+
+Primera versión local en **http://127.0.0.1:3002**: lectura de proyectos autorizados,
+estado de Git y archivos de texto que se pueden revisar y enviar al chat de Claude.
+Voz masculina en español Alex con Kokoro en CPU, sin API de voz paga, y respaldo
+del navegador. Iniciar con `npm run desktop` después de compilar y configurar
+las carpetas privadas. Ver [Desktop Agent](desktop-agent/README.md) y
+[instalación de voz](voice-local/README.md).
+
+El acceso a la PC desde el celular, la escritura y la ejecución de trabajos
+siguen pendientes. La interfaz local usa la memoria existente de Neon mediante
+HTTPS; esta versión no agrega tablas ni cambia la base de producción.
+
 ```
 frontend/   React + Vite — chat, tarjetas de herramientas, confirmaciones, historial
 backend/    Node + Fastify + TypeScript — SSE, herramientas, memoria SQLite local y PostgreSQL en nube

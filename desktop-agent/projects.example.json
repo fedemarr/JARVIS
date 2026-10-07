@@ -1,0 +1,6 @@
+{
+  "projects": [
+    { "id": "jarvis", "name": "Jarvis", "root": "C:\\ruta\\jarvis" },
+    { "id": "ohlimpiaerp", "name": "OhlimpiaERP", "root": "C:\\ruta\\ohlimpiaerp" }
+  ]
+}

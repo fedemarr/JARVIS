@@ -1,0 +1,74 @@
+{
+  "name": "jarvis_health_check",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "jarvis",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "webhook-node",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [0, 0],
+      "webhookId": "jarvis"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Responde al health check de JARVIS con el timestamp y un eco del envelope recibido.\n// En n8n 2.x el webhook pasa el evento completo (headers/query/body); extraemos el envelope.\nconst event = $input.all()[0].json;\nconst posted = event?.body?.json ?? event?.json ?? event?.body ?? event;\nreturn {\n  ok: true,\n  service: 'n8n',\n  workflow: 'jarvis_health_check',\n  received_at: new Date().toISOString(),\n  received: posted,\n  timezone: 'America/Argentina/Buenos_Aires',\n};\n"
+      },
+      "id": "code-echo",
+      "name": "Echo",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [220, 0]
+    },
+    {
+      "parameters": {
+        "options": {},
+        "respondWith": "json",
+        "responseBody": "={{ $json }}"
+      },
+      "id": "respond-node",
+      "name": "Respond to Webhook",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [440, 0]
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Echo",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Echo": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "pinData": {},
+  "meta": {
+    "templateCredsSetupCompleted": false,
+    "instanceId": "generated-by-jarvis"
+  }
+}

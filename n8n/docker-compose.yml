@@ -1,0 +1,33 @@
+services:
+  n8n:
+    image: docker.n8n.io/n8nio/n8n
+    container_name: n8n
+    restart: unless-stopped
+    ports:
+      - "5678:5678"
+    environment:
+      - N8N_HOST=localhost
+      - N8N_PORT=5678
+      - N8N_PROTOCOL=http
+      - N8N_SECURE_COOKIE=false
+      - N8N_RUNNERS_ENABLED=true
+      - GENERIC_TIMEZONE=America/Argentina/Buenos_Aires
+      - TZ=America/Argentina/Buenos_Aires
+      - N8N_DIAGNOSTICS_ENABLED=false
+      - N8N_METRICS=false
+      - N8N_BLOCK_ENV_ACCESS_IN_NODE=false
+      - JARVIS_BASE_URL=http://host.docker.internal:3001
+    volumes:
+      - ./n8n_data:/home/node/.n8n
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+# Notas:
+# - URL base: http://localhost:5678
+# - El webhook de entrada es POST /webhook/jarvis
+# - JARVIS corre en el HOST (puerto 3001). Desde adentro del contenedor,
+#   localhost:3001 NO es el backend. Para llegar a /api/brief, los nodos HTTP
+#   de n8n deben apuntar a: http://host.docker.internal:3001
+#   (`extra_hosts` arriba ya mapea host.docker.internal al host en Docker
+#   Desktop y en Linux con host-gateway).
+# - Los datos persisten en ./n8n_data (creado al primer arranque).

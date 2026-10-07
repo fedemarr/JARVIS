@@ -1,0 +1,87 @@
+{
+  "name": "jarvis_gmail",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "jarvis_gmail",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "webhook-node",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [0, 0],
+      "webhookId": "jarvis_gmail"
+    },
+    {
+      "parameters": {
+        "resource": "message",
+        "operation": "getAll",
+        "returnAll": false,
+        "limit": 20,
+        "simple": true,
+        "filters": {
+          "receivedAfter": "={{ $now.startOf('day').toISO() }}"
+        }
+      },
+      "id": "gmail-node",
+      "name": "Gmail",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [220, 0],
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Lista los correos recibidos hoy en la bandeja principal.\n// Si el nodo Gmail fallo (sin credencial o error de API),\n// devuelve un mensaje claro en vez de romper.\nlet mails = [];\nlet gmailOk = false;\ntry {\n  const g = $('Gmail');\n  if (g.isExecuted) {\n    gmailOk = true;\n    mails = g.all().map((item) => item.json);\n  }\n} catch (e) {\n  gmailOk = false;\n}\n\nif (!gmailOk) {\n  return { text: 'No pude leer Gmail. Revisá que la credencial Google OAuth2 esté cargada en n8n (Settings > Credentials) y que el workflow esté activo.' };\n}\n\nif (!mails.length) {\n  return { text: 'No recibiste correos hoy.' };\n}\n\nconst lines = mails.map((m, i) => {\n  const from = m.from ? (Array.isArray(m.from) ? m.from.map((f) => f.name || f.email).join(', ') : String(m.from)) : '(sin remitente)';\n  const date = m.date ? new Date(m.date) : null;\n  const hora = date ? date.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit', hour12: false }) : '';\n  return `${i + 1}. ${hora ? '[' + hora + '] ' : ''}${m.subject || '(sin asunto)'} — de ${from}`;\n});\n\nreturn { text: `Correos de hoy (${mails.length}):\\n\\n` + lines.join('\\n') };\n"
+      },
+      "id": "code-format",
+      "name": "Formatear correos",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [440, 0]
+    },
+    {
+      "parameters": {
+        "options": {},
+        "respondWith": "json",
+        "responseBody": "={{ $json }}"
+      },
+      "id": "respond-node",
+      "name": "Respond to Webhook",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [660, 0]
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          { "node": "Gmail", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Gmail": {
+      "main": [
+        [
+          { "node": "Formatear correos", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Formatear correos": {
+      "main": [
+        [
+          { "node": "Respond to Webhook", "type": "main", "index": 0 }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v2",
+    "binaryMode": "separate",
+    "availableInMCP": false
+  }
+}

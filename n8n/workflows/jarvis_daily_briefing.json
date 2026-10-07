@@ -1,0 +1,120 @@
+{
+  "name": "jarvis_daily_briefing",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "jarvis_daily_briefing",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "webhook-node",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [0, 0],
+      "webhookId": "jarvis_daily_briefing"
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "https://api.open-meteo.com/v1/forecast?latitude=-34.60&longitude=-58.38&daily=temperature_2m_max,temperature_2m_min,precipitation_sum&timezone=America%2FArgentina%2FBuenos_Aires",
+        "options": {}
+      },
+      "id": "weather-node",
+      "name": "Weather Open-Meteo",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [220, 0]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $env.JARVIS_BASE_URL }}/api/brief",
+        "options": {}
+      },
+      "id": "brief-node",
+      "name": "Brief de JARVIS",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [440, 0]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Combina clima (Open-Meteo) + tareas (JARVIS /api/brief) en texto listo para leer.\n// Cadena secuencial: Weather -> Brief -> este nodo. Sin ramas paralelas.\nconst brief = $input.first().json;\nconst weather = $('Weather Open-Meteo').first().json;\n\nconst daily = weather?.daily ?? {};\nconst tempMax = Array.isArray(daily.temperature_2m_max) ? daily.temperature_2m_max[0] : null;\nconst tempMin = Array.isArray(daily.temperature_2m_min) ? daily.temperature_2m_min[0] : null;\nconst rain = Array.isArray(daily.precipitation_sum) ? daily.precipitation_sum[0] : null;\n\nconst tasks = Array.isArray(brief?.tasks_today) ? brief.tasks_today : [];\nconst taskLines = tasks.length\n  ? tasks.map((t, i) => `${i + 1}. ${t.title}`).join('\\n')\n  : 'No tenés tareas para hoy.';\n\nconst lines = [\n  `Resumen de hoy, ${brief?.date_text ?? ''}:`,\n  `- Clima: máx ${tempMax ?? 'n/d'}°C, mín ${tempMin ?? 'n/d'}°C, lluvia ${rain ?? 0}mm.`,\n  `- Tareas de hoy:\\n${taskLines}`,\n];\n\nreturn { text: lines.join('\\n\\n') };\n"
+      },
+      "id": "code-format",
+      "name": "Formatear resumen",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [660, 0]
+    },
+    {
+      "parameters": {
+        "options": {},
+        "respondWith": "json",
+        "responseBody": "={{ $json }}"
+      },
+      "id": "respond-node",
+      "name": "Respond to Webhook",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [880, 0]
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Weather Open-Meteo",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Weather Open-Meteo": {
+      "main": [
+        [
+          {
+            "node": "Brief de JARVIS",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Brief de JARVIS": {
+      "main": [
+        [
+          {
+            "node": "Formatear resumen",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Formatear resumen": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v2"
+  },
+  "staticData": null,
+  "pinData": {},
+  "meta": {
+    "templateCredsSetupCompleted": false,
+    "instanceId": "generated-by-jarvis"
+  }
+}

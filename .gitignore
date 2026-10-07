@@ -1,0 +1,29 @@
+node_modules/
+data/
+dist/
+*.log
+.env
+.env.local
+
+# Configuracion privada (conservar solo la plantilla)
+.env.*
+!.env.example
+
+# Datos y credenciales de n8n
+n8n/n8n_data/
+
+# Bases de datos, capturas y sesiones locales
+*.db
+*.db-*
+*.sqlite
+*.sqlite-*
+artifacts/
+playwright-report/
+test-results/
+
+# Configuracion de despliegue local y caches
+.vercel/
+*.tsbuildinfo
+
+# Archivo accidental de una sesion de terminal
+backend/process.exit(0)

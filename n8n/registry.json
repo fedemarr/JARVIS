@@ -1,0 +1,32 @@
+{
+  "workflows": [
+    {
+      "name": "health_check",
+      "n8n_workflow": "jarvis_health_check",
+      "webhook_path": "jarvis",
+      "description": "Verifica la conexión con n8n: devuelve timestamp y ecos del envelope que recibió.",
+      "category": "ADMIN",
+      "risk": "LOW",
+      "input_schema": {
+        "type": "object",
+        "properties": {},
+        "required": []
+      },
+      "active": true
+    },
+    {
+      "name": "daily_briefing",
+      "n8n_workflow": "jarvis_daily_briefing",
+      "webhook_path": "jarvis_daily_briefing",
+      "description": "Arma el resumen diario: clima de Buenos Aires (Open-Meteo, sin API key) + las tareas de hoy del usuario desde JARVIS (/api/brief). Devuelve el texto listo para leer.",
+      "category": "AUTOMATION",
+      "risk": "MEDIUM",
+      "input_schema": {
+        "type": "object",
+        "properties": {},
+        "required": []
+      },
+      "active": true
+    }
+  ]
+}

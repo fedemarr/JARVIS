@@ -13,8 +13,10 @@ export function TicketAgentPanel({ticketPath}:{ticketPath:string}) {
   const [notice,setNotice]=useState('Comprobando Claude Code…');
   const [busy,setBusy]=useState(false);
   const [erpTickets,setErpTickets]=useState<ErpTicket[]>([]);
+  const [erpLoaded,setErpLoaded]=useState(false);
   const [erpSelector,setErpSelector]=useState('siguiente');
   const [erpNotice,setErpNotice]=useState('');
+  const [showHistory,setShowHistory]=useState(false);
   async function refresh() {
     const response=await ticketFetch('/api/tickets',{signal:AbortSignal.timeout(12000)});
     if(!response.ok)throw new Error('No pude consultar los tickets.');
@@ -23,7 +25,7 @@ export function TicketAgentPanel({ticketPath}:{ticketPath:string}) {
   useEffect(()=>{
     let active=true;
     void readErpTickets().then(rows=>{
-      if(active){setTicketContext(rows);setErpTickets([...rows.filter((t:ErpTicket)=>/^(abierto|en progreso)$/i.test(t.state)),...rows.filter((t:ErpTicket)=>!/^(abierto|en progreso)$/i.test(t.state))]);}
+      if(active){setErpLoaded(true);setTicketContext(rows);setErpTickets([...rows.filter((t:ErpTicket)=>/^(abierto|en progreso)$/i.test(t.state)),...rows.filter((t:ErpTicket)=>!/^(abierto|en progreso)$/i.test(t.state))]);}
     }).catch(()=>{});
     void ticketFetch('/api/tickets/status',{signal:AbortSignal.timeout(15000)}).then(async response=>{
       if(!response.ok)throw new Error();const status=await response.json();
@@ -72,6 +74,7 @@ export function TicketAgentPanel({ticketPath}:{ticketPath:string}) {
       else {
         const pending=data.filter((ticket:ErpTicket)=>/^(abierto|en progreso)$/i.test(ticket.state));
         setTicketContext(data);
+        setErpLoaded(true);
         const completed=data.filter((ticket:ErpTicket)=>!/^(abierto|en progreso)$/i.test(ticket.state));
         setErpTickets([...pending,...completed]);
         setErpNotice(`Encontré ${data.length} tickets: ${pending.length} pendientes. «Siguiente» toma el primer pendiente en el orden de la bandeja.`);
@@ -83,20 +86,26 @@ export function TicketAgentPanel({ticketPath}:{ticketPath:string}) {
     }catch(e){const message=e instanceof Error?e.message:'No pude conectar con OhlimpiaERP.';setErpNotice(message);window.dispatchEvent(new CustomEvent('jarvis-ticket-notice',{detail:message}));}
     finally{setBusy(false);}
   }
+  const activeJobs=jobs.filter(running);
+  const visibleJobs=showHistory?jobs:activeJobs.length?activeJobs:jobs.slice(0,1);
   return <section className="ticket-agent">
-    <span className="eyebrow">CLAUDE CODE · TICKETS</span>
+    <div className="ticket-overview"><div><span className="eyebrow">TU ESPACIO DE TRABAJO</span><h2>De un ticket a una solución.</h2><p>{notice}</p></div><div className="ticket-metrics"><div><strong>{erpLoaded?erpTickets.filter(ticket=>/^(abierto|en progreso)$/i.test(ticket.state)).length:'—'}</strong><span>Pendientes</span></div><div><strong>{activeJobs.length}</strong><span>En ejecución</span></div></div></div>
     <div className="erp-inbox"><strong>OhlimpiaERP · bandeja en la web</strong>
       <div><button type="button" disabled={busy} onClick={()=>void erpAction('connect')}>Conectar OhlimpiaERP</button><button type="button" disabled={busy} onClick={()=>void erpAction('list')}>Ver tickets de la web</button></div>
       <select aria-label="Ticket de la web" value={erpSelector} onChange={event=>setErpSelector(event.target.value)}><option value="siguiente">Siguiente pendiente</option>{erpTickets.map(ticket=><option key={ticket.id} value={ticket.id}>{ticket.number} · {ticket.title} · {ticket.state}</option>)}</select>
       <button type="button" disabled={busy || !available || jobs.some(running)} onClick={()=>void start(instruction,erpSelector)}>Descargar y resolver ticket de la web</button>
       <p role="status">{erpNotice || 'Conectá tu usuario DEVELOPER una vez. Después Jarvis usa la sesión guardada en esta PC.'}</p>
     </div>
-    <p>{ticketPath?`Ticket seleccionado: ${ticketPath}`:'Elegí un .md / .html de OhlimpiaERP arriba, o pegá el pedido acá.'}</p>
+    <div className="ticket-request"><span className="eyebrow">INSTRUCCIONES PARA CLAUDE CODE</span><h3>Preparar el trabajo</h3>
+    <p>{ticketPath?`Ticket seleccionado: ${ticketPath}`:'Usá la bandeja de OhlimpiaERP, seleccioná un archivo en Computadora o describí el pedido.'}</p>
     <textarea aria-label="Pedido para Claude Code" value={instruction} onChange={event=>setInstruction(event.target.value)} rows={3} maxLength={32000} />
     <button type="button" disabled={!available || busy || jobs.some(running) || instruction.trim().length<10} onClick={()=>void start()}>{busy?'Iniciando…':'Resolver ticket con Claude'}</button>
     <p role="status">{notice}</p>
     <p>Claude modifica tu proyecto original de OhlimpiaERP y ejecuta comprobaciones. El historial de Git y los cambios previos se conservan. No publica ni cierra el ticket automáticamente.</p>
-    {jobs.slice(0,5).map(job=><article key={job.id} className="ticket-job">
+    </div>
+    <div className="ticket-executions"><div className="execution-heading"><div><span className="eyebrow">SEGUIMIENTO</span><h3>{activeJobs.length?'Trabajo en curso':'Último trabajo'}</h3></div><button type="button" aria-expanded={showHistory} onClick={()=>setShowHistory(value=>!value)}>{showHistory?'Ocultar historial':`Ver historial · ${jobs.length}`}</button></div>
+    {jobs.length===0 && <div className="jobs-empty">Todavía no hay ejecuciones. Elegí un ticket para empezar.</div>}
+    {visibleJobs.map(job=><article key={job.id} className={`ticket-job ticket-job-${job.status}`}>
       <strong>{labels[job.status] || job.status}</strong><p>{job.message}</p>
       {job.editorOpened && <p>Proyecto abierto en VS Code · Claude Code está conectado al ejecutor local.</p>}
       {job.editorError && <p role="status">{job.editorError}</p>}
@@ -106,5 +115,6 @@ export function TicketAgentPanel({ticketPath}:{ticketPath:string}) {
       {job.checks && <details><summary>Comprobaciones</summary>{job.checks.map((check,index)=><div key={index}><strong>{check.status==='passed'?'✓':check.status==='failed'?'✕':'Pendiente'} · {check.name}</strong><pre>{check.output}</pre></div>)}</details>}
       {job.diff && <details><summary>Ver cambios · {job.files?.length || 0} archivos</summary><pre>{job.diff}</pre></details>}
     </article>)}
+    </div>
   </section>;
 }

@@ -4,7 +4,7 @@ import { TicketAgentPanel } from './TicketAgentPanel';
 
 type Project = {id:string;name:string};
 type FileEntry = {name:string;path:string;directory:boolean};
-export function DesktopPanel({onImport,disabled}:{onImport:(text:string)=>void;disabled:boolean}) {
+export function DesktopPanel({onImport,disabled,area}:{onImport:(text:string)=>void;disabled:boolean;area:'communication'|'tickets'|'computer'}) {
   const [connected,setConnected]=useState(false);
   const [attempt,setAttempt]=useState(0);
   const [projects,setProjects]=useState<Project[]>([]);
@@ -47,14 +47,19 @@ export function DesktopPanel({onImport,disabled}:{onImport:(text:string)=>void;d
     } catch(error) {setNotice(error instanceof Error?error.message:'No pude leer el proyecto.');}
     finally {setBusy(false);}
   }
-  return <section className="desktop-panel"><span className="eyebrow">ESTA COMPUTADORA</span>
+  return <section className="desktop-panel"><span className="eyebrow">{area==='tickets'?'OHLIMPIAERP / DESARROLLO':'ESTA COMPUTADORA / PROYECTOS'}</span>
     {!connected?<><p>Chat e internet disponibles. Conectá esta PC para sumar tus proyectos y la voz Alex en esta misma pantalla.</p><button type="button" onClick={()=>setAttempt((value)=>value+1)}>Conectar esta PC</button><p>El agente debe estar encendido. Si el navegador lo pide, permití el acceso a la red local.</p></>:<>
-      <p>{natural?'Voz natural lista · Alex':voiceStarting?'Preparando voz natural · respaldo del navegador activo':'Voz del navegador activa · motor local no disponible'} · Solo lectura</p>
+      <div hidden={area!=='computer'} className="computer-content">
+      <h2>Archivos y proyectos</h2><p>Explorá tus carpetas y llevá contexto a la conversación.</p>
+      <p>{natural?'Voz natural lista · Alex':voiceStarting?'Preparando voz natural · respaldo del navegador activo':'Voz del navegador activa · motor local no disponible'} · Exploración de archivos en solo lectura</p>
       <div className="desktop-controls"><select aria-label="Proyecto local" value={project} onChange={(event)=>{setProject(event.target.value);setDirectory('.');}}>{projects.map((p)=><option key={p.id} value={p.id}>{p.name}</option>)}</select><button type="button" disabled={disabled || busy || !project} onClick={()=>void importContext('git')}>Estado de Git → chat</button></div>
       <div className="desktop-folder"><span>{directory==='.'?'Carpeta principal':directory}</span>{directory!=='.' && <button type="button" onClick={()=>setDirectory(directory.split('/').slice(0,-1).join('/') || '.')}>↑ Volver</button>}</div>
       <ul className="desktop-files">{files.map((file)=><li key={file.path}><button type="button" disabled={busy || disabled} onClick={()=>file.directory?setDirectory(file.path):void importContext('read',file.path)}>{file.directory?'▸':'↗'} {file.name}</button></li>)}</ul>
       {notice && <p role="status">{notice}</p>}
+      </div>
+      <div hidden={area!=='tickets'} className="tickets-content">
       <TicketAgentPanel ticketPath={ticketPath} />
+      </div>
     </>}
   </section>;
 }

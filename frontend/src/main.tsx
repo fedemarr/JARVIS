@@ -4,6 +4,7 @@ import App from './App.tsx'
 import { AccessGate } from './components/AccessGate'
 import './index.css'
 import './hud.css'
+import './workspaces.css'
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode><AccessGate><App /></AccessGate></React.StrictMode>,

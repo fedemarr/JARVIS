@@ -67,7 +67,7 @@ async function run() {
       } });
     });
     await page.goto(`http://127.0.0.1:${server.address().port}`);
-    await page.getByText('BACKEND CONECTADO', { exact: true }).waitFor();
+    await page.getByText('EN LÍNEA', { exact: true }).waitFor();
     const coreBounds = await page.getByRole('region', { name: 'Estado del asistente' }).boundingBox();
     const chatBounds = await page.getByRole('region', { name: 'Conversación' }).boundingBox();
     assert(chatBounds.x >= coreBounds.x + coreBounds.width, 'Chat al costado del núcleo');
@@ -87,8 +87,9 @@ async function run() {
     await page.getByRole('button', { name: 'Nueva misión' }).click();
     await page.getByText('¿Cuál es la misión?').waitFor();
     const textarea = page.getByRole('textbox', { name: 'Mensaje para Jarvis' });
-    await page.getByRole('button', { name: 'Resolver un ticket' }).click();
-    assert.match(await textarea.inputValue(), /OhlimpiaERP/);
+    await page.getByRole('button', { name: 'Ir a tickets' }).click();
+    assert(await page.getByRole('region', { name: 'Espacio de tickets' }).isVisible());
+    assert(!(await textarea.isVisible()), 'El chat no comparte su sector con los tickets');
     const upload = page.locator('input[type=file]');
     await upload.setInputFiles({ name: 'ticket.html', mimeType: 'text/html', buffer: Buffer.from('<h1>Error al guardar</h1><p>La factura falla.</p><script>window.ticketExecuted = true;</script>') });
     await page.waitForFunction(() => document.querySelector('textarea').value.includes('La factura falla.'));
@@ -113,6 +114,7 @@ async function run() {
     assert.equal(await page.evaluate(()=>window.recognitionStarts),0,'No abrir el micrófono mientras está hablando');
     assert.equal(await page.evaluate(() => window.spoken.slice(2).join('')), replyParts.join(''), 'Leer toda la respuesta en orden');
     assert.match(submitted.message, /Corregir validación/);
+    await page.getByRole('button', { name: /^Tickets/ }).click();
     await upload.setInputFiles({ name: 'grande.md', mimeType: 'text/markdown', buffer: Buffer.alloc(66000, 'x') });
     await page.getByRole('alert').waitFor();
     assert.match(await page.getByRole('alert').textContent(), /64 KB/);
@@ -132,6 +134,10 @@ async function run() {
     assert.equal(await page.evaluate(() => window.lastRecognition.active), false, 'No escuchar su propia voz');
     await page.evaluate(() => window.lastUtterance.onend());
     await page.waitForFunction(() => window.recognitionStarts === 3);
+    await page.getByRole('button', { name: /^Tickets/ }).click();
+    await page.getByRole('button', { name: /^Computadora/ }).click();
+    await page.getByRole('button', { name: /^Comunicación/ }).click();
+    assert(await page.getByRole('button', { name: 'Desactivar manos libres' }).isVisible(), 'Cambiar de sector conserva la conversación por voz');
     await page.evaluate(() => window.say('ayudame a estudiar'));
     await page.getByText(replyParts.join(''), { exact: true }).waitFor();
     assert.equal(submitted.message, 'ayudame a estudiar');
@@ -169,7 +175,12 @@ async function run() {
     await page.screenshot({ path: path.join(artifacts, 'jarvis-desktop.png'), fullPage: true });
     await page.setViewportSize({ width: 390, height: 844 });
     assert(await textarea.isVisible());
+    await page.getByRole('button', { name: /^Tickets/ }).click();
     assert(await page.getByRole('button', { name: 'Importar ticket' }).isVisible());
+    await page.getByRole('button', { name: /^Computadora/ }).click();
+    assert(await page.getByRole('region', { name: 'Espacio de computadora' }).isVisible());
+    await page.getByRole('button', { name: /^Comunicación/ }).click();
+    assert(await textarea.isVisible());
     assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth), false, 'Sin desborde horizontal en móvil');
     await page.screenshot({ path: path.join(artifacts, 'jarvis-mobile.png'), fullPage: true });
     assert.deepEqual(errors, []);

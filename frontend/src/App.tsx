@@ -18,6 +18,8 @@ import { LlmMessage } from '../../shared/llm';
 function App() {
   const access = useAccess();
   const [input, setInput] = useState('');
+  const [activeArea, setActiveArea] = useState<'communication' | 'tickets' | 'computer'>('communication');
+  const prepareMessage = (text:string) => { setInput(text); setActiveArea('communication'); };
   const [coreGreeting, setCoreGreeting] = useState('');
   const [handsFree, setHandsFree] = useState(() => {
     if (new URLSearchParams(window.location.search).get('desktop') !== '1') return false;
@@ -245,16 +247,17 @@ function App() {
       <aside className="command-sidebar">
         <a className="brand" href="/" aria-label="Jarvis, inicio"><span className="brand-mark">J</span><div>JARVIS<small>PERSONAL INTELLIGENCE</small></div></a>
         <div className="sidebar-section-label">CENTRO DE MANDO</div>
-        <button className="nav-item nav-active" onClick={handleNewConversation} disabled={isLoading}><span>◈</span> Nueva misión <span className="nav-plus">+</span></button>
-        <button className="nav-item" disabled={isLoading} onClick={() => setInput('Ayudame con un ticket de OhlimpiaERP. Primero pedime el ticket y la ruta del proyecto para revisar su estructura y buenas prácticas.')}><span>⌘</span> OhlimpiaERP</button>
-        <button className="nav-item" disabled={isLoading} onClick={() => setInput('Ayudame a planificar mi día a partir de mis tareas pendientes.')}><span>◎</span> Mi día</button>
-        <button className="nav-item" disabled={isLoading} onClick={() => setInput('Quiero estudiar un tema. Preguntame cuál y mi nivel para armar una sesión práctica.')}><span>◇</span> Estudio</button>
-        <button className="nav-item" disabled={isLoading} onClick={() => setInput('Ayudame a preparar una campaña de marketing para mi empresa. Preguntame objetivo, público y presupuesto.')}><span>↗</span> Marketing</button>
+        <button className="nav-item" onClick={() => { setActiveArea('communication'); handleNewConversation(); }} disabled={isLoading}><span>◈</span> Nueva misión <span className="nav-plus">+</span></button>
+        <button className={`nav-item ${activeArea === 'tickets' ? 'nav-active' : ''}`} onClick={() => setActiveArea('tickets')}><span>⌘</span> OhlimpiaERP</button>
+        <div className="sidebar-section-label personal-heading">ASISTENCIA PERSONAL</div>
+        <button className="nav-item" disabled={isLoading} onClick={() => prepareMessage('Ayudame a planificar mi día a partir de mis tareas pendientes.')}><span>◎</span> Mi día</button>
+        <button className="nav-item" disabled={isLoading} onClick={() => prepareMessage('Quiero estudiar un tema. Preguntame cuál y mi nivel para armar una sesión práctica.')}><span>◇</span> Estudio</button>
+        <button className="nav-item" disabled={isLoading} onClick={() => prepareMessage('Ayudame a preparar una campaña de marketing para mi empresa. Preguntame objetivo, público y presupuesto.')}><span>↗</span> Marketing</button>
         <div className="sidebar-section-label history-heading">CONVERSACIONES <span>{conversations.length.toString().padStart(2, '0')}</span></div>
         <div className="conversation-list">
           {conversations.length === 0 && <p className="sidebar-empty">Tu próxima idea empieza acá.</p>}
           {conversations.map((conv) => (
-            <button key={conv.id} disabled={isLoading} className={`conversation-item ${conv.id === currentConversationId ? 'conversation-selected' : ''}`} onClick={() => selectConversation(conv.id)}>
+            <button key={conv.id} disabled={isLoading} className={`conversation-item ${conv.id === currentConversationId ? 'conversation-selected' : ''}`} onClick={() => { setActiveArea('communication'); selectConversation(conv.id); }}>
               <span>›</span>{conv.title || 'Sin título'}
             </button>
           ))}
@@ -265,10 +268,15 @@ function App() {
 
       <main className="command-main">
         <header className="command-header">
-          <div><span className="eyebrow">JARVIS / CONTROL CENTRAL</span><h1>Tu inteligencia. En acción.</h1></div>
-          <div className={`connection-chip connection-${backendStatus}`}><span />{backendStatus === 'connected' ? 'BACKEND CONECTADO' : backendStatus === 'checking' ? 'CONECTANDO' : 'SIN CONEXIÓN'}</div>
+          <div><span className="eyebrow">JARVIS / ESPACIO PERSONAL</span><h1>{activeArea === 'communication' ? 'Comunicación' : activeArea === 'tickets' ? 'Centro de tickets' : 'Tu computadora'}</h1></div>
+          <div className={`connection-chip connection-${backendStatus}`}><span />{backendStatus === 'connected' ? 'EN LÍNEA' : backendStatus === 'checking' ? 'CONECTANDO' : 'SIN CONEXIÓN'}</div>
         </header>
-        <div className="mission-workspace">
+        <nav className="workspace-navigation" aria-label="Sectores de Jarvis">
+          <button type="button" aria-label="Comunicación" aria-pressed={activeArea === 'communication'} onClick={() => setActiveArea('communication')}><span className="area-icon">◉</span><span>Comunicación<small>Conversación y voz</small></span></button>
+          <button type="button" aria-label="Tickets" aria-pressed={activeArea === 'tickets'} onClick={() => setActiveArea('tickets')}><span className="area-icon">⌘</span><span>Tickets<small>OhlimpiaERP y Claude Code</small></span></button>
+          <button type="button" aria-label="Computadora" aria-pressed={activeArea === 'computer'} onClick={() => setActiveArea('computer')}><span className="area-icon">▣</span><span>Computadora<small>Proyectos y archivos</small></span></button>
+        </nav>
+        <div className="mission-workspace" hidden={activeArea !== 'communication'}>
         <div className="main-scroll">
           <section className="core-stage" aria-label="Estado del asistente">
             <div className="core-note"><span className="eyebrow">ASISTENTE PERSONAL</span><h2>Bienvenido,<br /><span>Federico.</span></h2><p>Una misión a la vez.<br />Construyamos lo que sigue.</p></div>
@@ -285,17 +293,11 @@ function App() {
           </section>
 
           <section className="mission-shortcuts" aria-label="Preparar una misión">
-            <button disabled={isLoading} onClick={() => setInput('Analicemos un ticket de OhlimpiaERP. Te voy a importar el archivo; después revisá el proyecto antes de proponer cambios.')}><span className="shortcut-icon">⌘</span><div><strong>Resolver un ticket</strong><small>OhlimpiaERP · diagnóstico y solución</small></div><span>↗</span></button>
+            <button onClick={() => setActiveArea('tickets')}><span className="shortcut-icon">⌘</span><div><strong>Ir a tickets</strong><small>Tu bandeja y trabajos en curso</small></div><span>↗</span></button>
             <button disabled={isLoading} onClick={() => setInput('Revisá mis tareas pendientes y ayudame a elegir las prioridades de hoy.')}><span className="shortcut-icon">◎</span><div><strong>Organizar mi día</strong><small>Tareas · enfoque y próximos pasos</small></div><span>↗</span></button>
           </section>
 
-      <aside className="context-sidebar">
-        <div className="eyebrow context-heading">CONTEXTO OPERATIVO <span>◈</span></div>
-        <section className="context-panel priority-panel"><span className="eyebrow">MISIÓN PRIORITARIA</span><div className="project-emblem">O<span>ERP</span></div><h2>OhlimpiaERP</h2><p>De un ticket a una solución<br />con estructura y criterio.</p><div className="context-divider" /><ol className="workflow-steps"><li><span>01</span> Importar .md o .html</li><li><span>02</span> Revisar contexto y código</li><li><span>03</span> Resolver y probar</li><li><span>04</span> Revisar y aceptar</li></ol><small className="panel-note">Importación manual disponible. Integración con la nube pendiente.</small></section>
-        <section className="context-panel"><span className="eyebrow">DISPOSITIVOS</span><div className="device-row"><span className="device-symbol">▣</span><div>Esta computadora<small>Interfaz local</small></div><span className="device-tag">LOCAL</span></div><div className="device-row device-pending"><span className="device-symbol">▣</span><div>Computadora de casa<small>Vinculación pendiente</small></div></div></section>
-        <section className="context-panel model-panel"><span className="eyebrow">MOTOR DE INTELIGENCIA</span><p>{providerModel || 'Sin información del backend'}</p><small>La conexión con el modelo se verifica al enviar una misión.</small></section>
-        <div className="context-footnote"><span>JARVIS</span> EN CONSTANTE EVOLUCIÓN</div>
-      </aside>
+          <div className="session-strip"><span><i /> {handsFree ? 'Manos libres activo' : 'Chat y voz disponibles'}</span><span>{providerModel || 'Conectando inteligencia…'}</span></div>
         </div>
         <div className="chat-panel">
           <section className="conversation-feed" aria-label="Conversación">
@@ -307,8 +309,6 @@ function App() {
             <div ref={messagesEndRef} />
           </section>
         <div className="composer-wrap">
-          <DesktopPanel onImport={setInput} disabled={isLoading} />
-          <TicketImport onImport={setInput} disabled={isLoading} />
           <form onSubmit={handleSendText} className="command-composer">
             <MicButton listening={speech.orbState === 'LISTENING'} supported={speech.sttSupported} onStart={() => { setHandsFree(false); setVoiceAwake(false); speech.startListening(); }} onStop={speech.stopListening} />
             <textarea aria-label="Mensaje para Jarvis" rows={2} value={inputValue} onChange={(e) => setInput(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) { e.preventDefault(); e.currentTarget.form?.requestSubmit(); } }} placeholder={speech.orbState === 'LISTENING' ? 'Te escucho…' : 'Escribí tu próxima misión…'} />
@@ -335,6 +335,10 @@ function App() {
         </div>
         </div>
         </div>
+        <section className="local-view" hidden={activeArea === 'communication'} aria-label={activeArea === 'tickets' ? 'Espacio de tickets' : 'Espacio de computadora'}>
+          <DesktopPanel area={activeArea} onImport={(text) => { setInput(text); setActiveArea('communication'); }} disabled={isLoading} />
+          <div className="ticket-import-area" hidden={activeArea !== 'tickets'}><TicketImport onImport={(text) => { setInput(text); setActiveArea('communication'); }} disabled={isLoading} /></div>
+        </section>
       </main>
 
       <ConfirmDialog pending={pendingConfirmations} onConfirm={confirmAction} />

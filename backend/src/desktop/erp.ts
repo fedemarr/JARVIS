@@ -39,7 +39,18 @@ export class ErpBrowser {
     if(this.busy)throw new ErpError('Estoy consultando OhlimpiaERP. Esperá a que termine.');
     this.busy=true;try{return await action();}finally{this.busy=false;}
   }
-  async connect() {return this.locked(async()=>{await this.session(true);return {message:'Iniciá sesión con tu usuario DEVELOPER en la ventana de OhlimpiaERP. La sesión queda en esta PC.'};});}
+  async connect() {return this.locked(async()=>{
+    const page=await this.session(true);
+    await page.evaluate(()=>{
+      document.title='Vincular Jarvis · OhlimpiaERP';
+      if(!document.querySelector('#jarvis-link-banner')) {
+        const banner=document.createElement('div');banner.id='jarvis-link-banner';banner.textContent='VINCULAR OHLIMPIA CON JARVIS · Iniciá sesión en esta ventana';
+        banner.style.cssText='position:fixed;top:0;left:0;right:0;background:#07334c;color:#fff;padding:12px;z-index:999999;text-align:center;font:600 14px sans-serif;pointer-events:none';document.body.appendChild(banner);
+      }
+    });
+    await page.bringToFront();
+    return {message:'Iniciá sesión con tu usuario DEVELOPER en la ventana que dice «VINCULAR OHLIMPIA CON JARVIS». La sesión queda en esta PC.'};
+  });}
   async status() {
     if(!this.context) {
       try {await fs.access(path.join(this.root,'data','ohlimpia-browser'));await this.session(false);}catch{return {connected:false,loginRequired:true};}

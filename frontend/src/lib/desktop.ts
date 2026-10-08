@@ -50,6 +50,18 @@ export async function ticketFetch(url:string,init:RequestInit={}):Promise<Respon
   if(response.status===401)ticketCredential=undefined;
   return response;
 }
+type ErpTicketRow={id:string;number:string;title:string;state:string;priority:string};
+let readingErp:Promise<ErpTicketRow[]>|undefined;
+export function readErpTickets():Promise<ErpTicketRow[]> {
+  readingErp ??= (async()=>{
+    const response=await ticketFetch('/api/tickets/erp/list',{signal:AbortSignal.timeout(60000)});
+    const data=await response.json();
+    if(!response.ok)throw new Error(data.message || 'No pude consultar OhlimpiaERP.');
+    if(!Array.isArray(data))throw new Error('La bandeja no devolvió una lista de tickets.');
+    return data as ErpTicketRow[];
+  })().finally(()=>{readingErp=undefined;});
+  return readingErp;
+}
 export async function refreshDesktop() {
   try {
     const response=await desktopFetch('/api/desktop/status',{signal:AbortSignal.timeout(12000)});

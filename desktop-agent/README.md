@@ -36,3 +36,14 @@ Los trabajos se guardan en `data/ticket-jobs/<id>` como metadatos. Claude trabaj
 
 
 Claude Code privado de Jarvis: ejecutar `desktop-agent/setup-claude.ps1` instala la version 2.1.293 en `data/claude-runtime`, sin reemplazar el CLI habitual. Desde 2.1.221, print espera la conexion MCP antes del primer turno; se desactiva ToolSearch para exponer directamente las cinco herramientas. Reutiliza la sesion local de Claude, sin heredar claves de API.
+
+
+La credencial para iniciar/consultar/cancelar trabajos o abrir VS Code tiene una firma de propósito distinta de la credencial de lectura/voz. Las tareas requieren una acción explícita del usuario en la web autenticada.
+
+## Bandeja de OhlimpiaERP
+
+«Conectar OhlimpiaERP» abre una ventana de https://ohlimpiaerp.vercel.app para iniciar sesión con el perfil DEVELOPER. Jarvis usa un perfil de navegador propio, guardado únicamente en `data/ohlimpia-browser`; no copia el perfil habitual ni envía contraseñas o cookies a Vercel. Después de iniciar sesión, las consultas pasan a segundo plano. La implementación usa [sesiones persistentes y descargas de Playwright](https://playwright.dev/docs/api/class-browsertype#browser-type-launch-persistent-context).
+
+«Ver tickets de la web» consulta la bandeja. «Descargar y resolver» guarda una especificación Markdown y adjuntos .md/.html en `ohlimpiaerp/jarvis-tickets/<id>-<sufijo>/`, sin sobrescribir archivos existentes, y los pasa al ejecutor de Claude. Se admiten diez adjuntos de hasta 512 KB cada uno; los adjuntos no compatibles requieren revisión antes de ejecutar. Claude consulta esos archivos por líneas para no cargar todos los mockups en el prompt inicial. El HTML descargado se trata como referencia, nunca se abre como página. No se pulsa Guardar, Eliminar, Generar prompt, ni se modifican estados del ERP.
+
+El chat/manos libres reconoce «Entrá a OhlimpiaERP y hacé el siguiente ticket» y «Resolvé el ticket 191 de OhlimpiaERP». Siguiente significa el primer Abierto/En progreso en el orden de la bandeja. Los números son los que muestra el ERP y pueden cambiar al ingresar tickets nuevos; la selección visual utiliza el ID interno. La ejecucion trabaja en el proyecto original y comprueba los cambios. Reconoce nombres de pendientes con o sin tilde. Retomar con Claude continua tareas interrumpidas conservando el pedido, los cambios y su registro Git.

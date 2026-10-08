@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { ticketFetch } from '../lib/desktop';
+import { ticketFetch, readErpTickets } from '../lib/desktop';
 import { parseTicketCommand, setTicketContext } from '../lib/ticketCommand';
 
 type Job={id:string;status:string;message:string;editorOpened?:boolean;editorError?:string;summary?:string;diff?:string;files?:string[];checks?:{name:string;status:string;output:string}[]};
@@ -22,8 +22,8 @@ export function TicketAgentPanel({ticketPath}:{ticketPath:string}) {
   }
   useEffect(()=>{
     let active=true;
-    void ticketFetch('/api/tickets/erp/list',{signal:AbortSignal.timeout(60000)}).then(async response=>{
-      if(!response.ok)return;const rows=await response.json();if(active){setTicketContext(rows);setErpTickets([...rows.filter((t:ErpTicket)=>/^(abierto|en progreso)$/i.test(t.state)),...rows.filter((t:ErpTicket)=>!/^(abierto|en progreso)$/i.test(t.state))]);}
+    void readErpTickets().then(rows=>{
+      if(active){setTicketContext(rows);setErpTickets([...rows.filter((t:ErpTicket)=>/^(abierto|en progreso)$/i.test(t.state)),...rows.filter((t:ErpTicket)=>!/^(abierto|en progreso)$/i.test(t.state))]);}
     }).catch(()=>{});
     void ticketFetch('/api/tickets/status',{signal:AbortSignal.timeout(15000)}).then(async response=>{
       if(!response.ok)throw new Error();const status=await response.json();
@@ -67,7 +67,7 @@ export function TicketAgentPanel({ticketPath}:{ticketPath:string}) {
   async function erpAction(action:'connect'|'list') {
     setBusy(true);setErpNotice(action==='connect'?'Abriendo OhlimpiaERP…':'Consultando la bandeja…');
     try {
-      const response=await ticketFetch('/api/tickets/erp/'+action,{method:action==='connect'?'POST':'GET',signal:AbortSignal.timeout(60000)});const data=await response.json();if(!response.ok)throw new Error(data.message);
+      const data=action==='list'?await readErpTickets():await (async()=>{const response=await ticketFetch('/api/tickets/erp/connect',{method:'POST',signal:AbortSignal.timeout(60000)});const value=await response.json();if(!response.ok)throw new Error(value.message);return value;})();
       if(action==='connect')setErpNotice(data.message);
       else {
         const pending=data.filter((ticket:ErpTicket)=>/^(abierto|en progreso)$/i.test(ticket.state));

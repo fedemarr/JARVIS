@@ -27,11 +27,11 @@ async function terminal(runner:TicketRunner,id:string) {
   while(Date.now()<until){const job=(await runner.list()).find(j=>j.id===id)!;if(['ready','failed','cancelled'].includes(job.status))return job;await new Promise(resolve=>setTimeout(resolve,100));}
   throw new Error('La tarea no terminó.');
 }
-test('ticket: snapshot de cambios actuales, escritura aislada, diff y prueba real',async()=>{
+test('ticket: cambios directos en el proyecto, conserva ediciones previas e índice Git',async()=>{
   const fixtureData=await fixture();const {root,project,config}=fixtureData;
   const runner=new TicketRunner(config,root,async(workspace)=>{
     assert((await readTicketFile(workspace,'sum.js')).includes('// user edit'));
-    await assert.rejects(fs.access(path.join(workspace,'.env')));
+    assert.equal(workspace,project);await assert.rejects(readTicketFile(workspace,'.env'));
     await writeTicketFile(workspace,'sum.js','// user edit\nexport const sum=(a,b)=>a+b;');
     return 'Corregí la suma.';
   });
@@ -40,7 +40,9 @@ test('ticket: snapshot de cambios actuales, escritura aislada, diff y prueba rea
     const finished=await terminal(runner,job.id);
     assert.equal(finished.status,'ready');assert(finished.diff?.includes('a+b'));assert(finished.files?.includes('sum.js'));
     assert(finished.checks?.some(c=>c.name==='Pruebas unitarias' && c.status==='passed'));
-    assert((await fs.readFile(path.join(project,'sum.js'),'utf8')).includes('a-b'));
+    assert((await fs.readFile(path.join(project,'sum.js'),'utf8')).includes('a+b'));
+    assert.equal(execFileSync('git',['diff','--cached','--name-only'],{cwd:project,encoding:'utf8'}).trim(),'');
+    assert(!finished.diff?.includes('+// user edit'));
     const reloaded=new TicketRunner(config,root);assert.equal((await reloaded.list())[0].status,'ready');
   } finally{runner.close();await fixtureData.clean();}
 });
@@ -70,7 +72,7 @@ test('ticket: una sola tarea, cancelación y proyectos no autorizados',async()=>
     await runner.cancel(job.id);assert.equal((await terminal(runner,job.id)).status,'cancelled');
   }finally{runner.close();await data.clean();}
 });
-test('ticket: adjunto grande ignorado por Git se copia y se consulta sin inflar el prompt',async()=>{
+test('ticket: adjunto grande se consulta en el proyecto sin inflar el prompt',async()=>{
   const data=await fixture();const reference='jarvis-tickets/mockup.html';
   await fs.writeFile(path.join(data.project,'.gitignore'),'jarvis-tickets/\n');await fs.mkdir(path.join(data.project,'jarvis-tickets'));await fs.writeFile(path.join(data.project,reference),'<h1>Mockup</h1>'+'x'.repeat(80000));
   const runner=new TicketRunner(data.config,data.root,async(workspace,prompt)=>{

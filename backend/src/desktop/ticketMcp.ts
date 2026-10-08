@@ -2,6 +2,7 @@ import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { CallToolRequestSchema, ListToolsRequestSchema } from '@modelcontextprotocol/sdk/types.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { z } from 'zod';
+import fs from 'node:fs/promises';
 import { listTicketFiles, readTicketFile, writeTicketFile } from './ticketFiles';
 
 // Only this server exposes tools to Claude. No terminal, native filesystem tools, or other MCPs.
@@ -17,10 +18,11 @@ async function main() {
     {name:'list_files',description:'Listar una carpeta del proyecto.',inputSchema:{type:'object',properties:{path:{type:'string'}},additionalProperties:false}},
     {name:'read_file',description:'Leer código o documentación por líneas (hasta 200 líneas y 16 KB). No permite credenciales.',inputSchema:{type:'object',properties:{path:{type:'string'},startLine:{type:'integer',minimum:1},maxLines:{type:'integer',minimum:1,maximum:200}},required:['path'],additionalProperties:false}},
     {name:'search_files',description:'Buscar texto literal en el código del proyecto y obtener líneas relevantes.',inputSchema:{type:'object',properties:{query:{type:'string'},path:{type:'string'}},required:['query'],additionalProperties:false}},
-    {name:'write_file',description:'Crear o reemplazar un archivo en la copia del ticket.',inputSchema:{type:'object',properties:{path:{type:'string'},text:{type:'string'}},required:['path','text'],additionalProperties:false}},
+    {name:'write_file',description:'Crear o reemplazar un archivo en el proyecto autorizado.',inputSchema:{type:'object',properties:{path:{type:'string'},text:{type:'string'}},required:['path','text'],additionalProperties:false}},
     {name:'edit_file',description:'Reemplazar un fragmento exacto y único en un archivo. Preferir para archivos grandes.',inputSchema:{type:'object',properties:{path:{type:'string'},oldText:{type:'string'},newText:{type:'string'}},required:['path','oldText','newText'],additionalProperties:false}},
   ]}));
   server.setRequestHandler(CallToolRequestSchema,async request=>response(async()=>{
+    if(process.env.JARVIS_TICKET_AUDIT)await fs.appendFile(process.env.JARVIS_TICKET_AUDIT,JSON.stringify({at:new Date().toISOString(),tool:request.params.name})+'\n');
     const args=request.params.arguments;
     if(request.params.name==='list_files')return listTicketFiles(root,z.object({path:z.string().default('.')}).strict().parse(args || {}).path);
     if(request.params.name==='read_file') {

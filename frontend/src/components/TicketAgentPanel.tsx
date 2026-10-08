@@ -41,7 +41,7 @@ export function TicketAgentPanel({ticketPath}:{ticketPath:string}) {
       const response=await ticketFetch(fromErp?'/api/tickets/erp/run':'/api/tickets',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(fromErp?{selector:fromErp,instruction:text.length<10?'Resolvé el ticket seleccionado: '+text:text,openEditor:true}:{project:'ohlimpiaerp',instruction:text,openEditor:true,...(ticketPath?{ticketPath}:{})}),signal:AbortSignal.timeout(fromErp?180000:20000)});
       const data=await response.json();if(!response.ok)throw new Error(data.message);
       setJobs(previous=>[data,...previous]);setNotice('Ticket iniciado. Podés seguir usando el chat mientras Claude trabaja.');
-      window.dispatchEvent(new CustomEvent('jarvis-ticket-notice',{detail:'Inicié el ticket con Claude Code. Voy a abrir la copia en VS Code para que sigas los cambios. Las comprobaciones aparecerán en el panel.'}));
+      window.dispatchEvent(new CustomEvent('jarvis-ticket-notice',{detail:'Inicié el ticket con Claude Code en tu proyecto original de OhlimpiaERP y lo voy a abrir en VS Code. Las comprobaciones aparecerán en el panel.'}));
     } catch(e){const message=e instanceof Error?e.message:'No pude iniciar el ticket.';setNotice(message);window.dispatchEvent(new CustomEvent('jarvis-ticket-notice',{detail:message}));}
     finally{setBusy(false);}
   }
@@ -61,7 +61,7 @@ export function TicketAgentPanel({ticketPath}:{ticketPath:string}) {
     return()=>window.removeEventListener('jarvis-run-ticket',request);
   },[available,busy,jobs,ticketPath,instruction]);
   async function action(id:string,action:'cancel'|'open') {
-    try {const response=await ticketFetch(`/api/tickets/${id}/${action}`,{method:'POST',signal:AbortSignal.timeout(20000)});const data=await response.json();if(!response.ok)throw new Error(data.message);setNotice(action==='open'?'Abrí la copia del ticket en VS Code.':'Deteniendo el ticket…');await refresh();}
+    try {const response=await ticketFetch(`/api/tickets/${id}/${action}`,{method:'POST',signal:AbortSignal.timeout(20000)});const data=await response.json();if(!response.ok)throw new Error(data.message);setNotice(action==='open'?'Abrí el proyecto del ticket en VS Code.':'Deteniendo el ticket…');await refresh();}
     catch(e){setNotice(e instanceof Error?e.message:'No pude completar la operación.');}
   }
   async function erpAction(action:'connect'|'list') {
@@ -95,10 +95,10 @@ export function TicketAgentPanel({ticketPath}:{ticketPath:string}) {
     <textarea aria-label="Pedido para Claude Code" value={instruction} onChange={event=>setInstruction(event.target.value)} rows={3} maxLength={32000} />
     <button type="button" disabled={!available || busy || jobs.some(running) || instruction.trim().length<10} onClick={()=>void start()}>{busy?'Iniciando…':'Resolver ticket con Claude'}</button>
     <p role="status">{notice}</p>
-    <p>Prepara los cambios en una copia separada y ejecuta comprobaciones. Revisá el resultado antes de integrarlo; no publica ni cierra el ticket.</p>
+    <p>Claude modifica tu proyecto original de OhlimpiaERP y ejecuta comprobaciones. El historial de Git y los cambios previos se conservan. No publica ni cierra el ticket automáticamente.</p>
     {jobs.slice(0,5).map(job=><article key={job.id} className="ticket-job">
       <strong>{labels[job.status] || job.status}</strong><p>{job.message}</p>
-      {job.editorOpened && <p>Copia del ticket abierta en VS Code · Claude Code está conectado al ejecutor local.</p>}
+      {job.editorOpened && <p>Proyecto abierto en VS Code · Claude Code está conectado al ejecutor local.</p>}
       {job.editorError && <p role="status">{job.editorError}</p>}
       {running(job)?<button type="button" onClick={()=>void action(job.id,'cancel')}>Detener tarea</button>:<button type="button" onClick={()=>void action(job.id,'open')}>Abrir cambios en VS Code</button>}
       {job.summary && <details><summary>Resumen de Claude</summary><pre>{job.summary}</pre></details>}

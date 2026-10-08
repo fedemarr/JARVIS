@@ -60,8 +60,8 @@ export function TicketAgentPanel({ticketPath}:{ticketPath:string}) {
     window.addEventListener('jarvis-run-ticket',request);
     return()=>window.removeEventListener('jarvis-run-ticket',request);
   },[available,busy,jobs,ticketPath,instruction]);
-  async function action(id:string,action:'cancel'|'open') {
-    try {const response=await ticketFetch(`/api/tickets/${id}/${action}`,{method:'POST',signal:AbortSignal.timeout(20000)});const data=await response.json();if(!response.ok)throw new Error(data.message);setNotice(action==='open'?'Abrí el proyecto del ticket en VS Code.':'Deteniendo el ticket…');await refresh();}
+  async function action(id:string,action:'cancel'|'open'|'retry') {
+    try {const response=await ticketFetch(`/api/tickets/${id}/${action}`,{method:'POST',signal:AbortSignal.timeout(20000)});const data=await response.json();if(!response.ok)throw new Error(data.message);setNotice(action==='open'?'Abrí el proyecto del ticket en VS Code.':action==='retry'?'Retomando el ticket con Claude…':'Deteniendo el ticket…');await refresh();}
     catch(e){setNotice(e instanceof Error?e.message:'No pude completar la operación.');}
   }
   async function erpAction(action:'connect'|'list') {
@@ -101,6 +101,7 @@ export function TicketAgentPanel({ticketPath}:{ticketPath:string}) {
       {job.editorOpened && <p>Proyecto abierto en VS Code · Claude Code está conectado al ejecutor local.</p>}
       {job.editorError && <p role="status">{job.editorError}</p>}
       {running(job)?<button type="button" onClick={()=>void action(job.id,'cancel')}>Detener tarea</button>:<button type="button" onClick={()=>void action(job.id,'open')}>Abrir cambios en VS Code</button>}
+      {['failed','cancelled'].includes(job.status) && <button type="button" disabled={jobs.some(running)} onClick={()=>void action(job.id,'retry')}>Retomar con Claude</button>}
       {job.summary && <details><summary>Resumen de Claude</summary><pre>{job.summary}</pre></details>}
       {job.checks && <details><summary>Comprobaciones</summary>{job.checks.map((check,index)=><div key={index}><strong>{check.status==='passed'?'✓':check.status==='failed'?'✕':'Pendiente'} · {check.name}</strong><pre>{check.output}</pre></div>)}</details>}
       {job.diff && <details><summary>Ver cambios · {job.files?.length || 0} archivos</summary><pre>{job.diff}</pre></details>}

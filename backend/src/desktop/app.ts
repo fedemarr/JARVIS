@@ -27,8 +27,8 @@ export function buildDesktopApp(config:DesktopConfig,root:string,cloud='https://
       const allowed=request.method==='GET'?/\/(?:status|list)$/.test(url):request.method==='POST' && /\/(?:connect|download|run)$/.test(url);
       return allowed && request.headers.origin===BRIDGE_ORIGIN && validBridgeToken((request.headers.authorization || '').replace(/^Bearer /,''),process.env.JARVIS_ACCESS_KEY!,Date.now(),'tickets');
     }
-    if(/^\/api\/bridge\/tickets(?:\/status|\/[a-f0-9-]{36}\/(?:cancel|open))?$/.test(url)) {
-      const allowed=request.method==='GET'?/^\/api\/bridge\/tickets(?:\/status)?$/.test(url):request.method==='POST' && (url==='/api/bridge/tickets' || /\/(?:cancel|open)$/.test(url));
+    if(/^\/api\/bridge\/tickets(?:\/status|\/[a-f0-9-]{36}\/(?:cancel|open|retry))?$/.test(url)) {
+      const allowed=request.method==='GET'?/^\/api\/bridge\/tickets(?:\/status)?$/.test(url):request.method==='POST' && (url==='/api/bridge/tickets' || /\/(?:cancel|open|retry)$/.test(url));
       return allowed && request.headers.origin===BRIDGE_ORIGIN && validBridgeToken((request.headers.authorization || '').replace(/^Bearer /,''),process.env.JARVIS_ACCESS_KEY!,Date.now(),'tickets');
     }
     const allowed=request.method==='GET'?/^\/api\/bridge\/(?:desktop\/(?:status|files|read|git)|voice\/status)$/:request.method==='POST' && url==='/api/bridge/voice/synthesize';
@@ -66,6 +66,7 @@ export function buildDesktopApp(config:DesktopConfig,root:string,cloud='https://
     });
     app.post<{Params:{id:string}}>(prefix+'/:id/cancel',async(request)=>tickets.cancel(request.params.id));
     app.post<{Params:{id:string}}>(prefix+'/:id/open',async(request)=>tickets.open(request.params.id));
+    app.post<{Params:{id:string}}>(prefix+'/:id/retry',async(request)=>tickets.retry(request.params.id));
   }
   app.post('/api/voice/synthesize',async(request,reply) => {
     const {text} = z.object({text:z.string().trim().min(1).max(220)}).strict().parse(request.body);

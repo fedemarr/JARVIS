@@ -82,3 +82,20 @@ test('ticket: adjunto grande se consulta en el proyecto sin inflar el prompt',as
   try{const job=await runner.start({project:'ohlimpiaerp',instruction:'Resolver el ticket con el mockup.',referencePaths:[reference]});assert.equal((await terminal(runner,job.id)).status,'ready');}
   finally{runner.close();await data.clean();}
 });
+
+test('ticket: retomar conserva cambios parciales, pedido original y diff completo',async()=>{
+  const data=await fixture();let attempts=0;
+  const runner=new TicketRunner(data.config,data.root,async(workspace,prompt)=>{
+    assert(prompt.includes('Resolver la suma original.'));
+    if(++attempts===1){await writeTicketFile(workspace,'sum.js','// user edit\nexport const sum=(a,b)=>a+b;');throw new Error('Conexión interrumpida.');}
+    assert((await readTicketFile(workspace,'sum.js')).includes('a+b'));return 'La suma está corregida.';
+  });
+  try{
+    const job=await runner.start({project:'ohlimpiaerp',instruction:'Resolver la suma original.',ticketPath:'ticket.md'});
+    assert.equal((await terminal(runner,job.id)).status,'failed');
+    await runner.retry(job.id);const finished=await terminal(runner,job.id);
+    assert.equal(finished.status,'ready');assert(finished.diff?.includes('a+b'));assert(!finished.diff?.includes('+// user edit'));
+    assert(finished.checks?.some(c=>c.name==='Pruebas unitarias' && c.status==='passed'));
+    assert.equal(execFileSync('git',['diff','--cached','--name-only'],{cwd:data.project,encoding:'utf8'}).trim(),'');
+  }finally{runner.close();await data.clean();}
+});

@@ -65,7 +65,16 @@ export function TicketAgentPanel({ticketPath}:{ticketPath:string}) {
     try {
       const response=await ticketFetch('/api/tickets/erp/'+action,{method:action==='connect'?'POST':'GET',signal:AbortSignal.timeout(60000)});const data=await response.json();if(!response.ok)throw new Error(data.message);
       if(action==='connect')setErpNotice(data.message);
-      else {setErpTickets(data);setErpNotice(`Encontré ${data.length} tickets. «Siguiente» toma el primer pendiente en el orden de la bandeja.`);window.dispatchEvent(new CustomEvent('jarvis-ticket-notice',{detail:`Encontré ${data.length} tickets en OhlimpiaERP. ${data.slice(0,8).map((ticket:ErpTicket)=>`${ticket.number}: ${ticket.title}, ${ticket.state}.`).join(' ')} Podés indicarme cuál resolver.`}));}
+      else {
+        const pending=data.filter((ticket:ErpTicket)=>/^(abierto|en progreso)$/i.test(ticket.state));
+        const completed=data.filter((ticket:ErpTicket)=>!/^(abierto|en progreso)$/i.test(ticket.state));
+        setErpTickets([...pending,...completed]);
+        setErpNotice(`Encontré ${data.length} tickets: ${pending.length} pendientes. «Siguiente» toma el primer pendiente en el orden de la bandeja.`);
+        const detail=pending.length
+          ? `Hay ${pending.length} tickets pendientes en OhlimpiaERP. ${pending.slice(0,8).map((ticket:ErpTicket)=>`${ticket.number}: ${ticket.title}, ${ticket.state}.`).join(' ')} Podés indicarme cuál resolver.`
+          : 'No hay tickets pendientes en OhlimpiaERP.';
+        window.dispatchEvent(new CustomEvent('jarvis-ticket-notice',{detail}));
+      }
     }catch(e){const message=e instanceof Error?e.message:'No pude conectar con OhlimpiaERP.';setErpNotice(message);window.dispatchEvent(new CustomEvent('jarvis-ticket-notice',{detail:message}));}
     finally{setBusy(false);}
   }

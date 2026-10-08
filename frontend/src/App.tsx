@@ -19,7 +19,16 @@ function App() {
   const access = useAccess();
   const [input, setInput] = useState('');
   const [coreGreeting, setCoreGreeting] = useState('');
-  const [handsFree, setHandsFree] = useState(false);
+  const [handsFree, setHandsFree] = useState(() => {
+    if (new URLSearchParams(window.location.search).get('desktop') !== '1') return false;
+    try { return localStorage.getItem('jarvis.desktop.handsFree') === 'true'; }
+    catch { return false; }
+  });
+  useEffect(() => {
+    if (new URLSearchParams(window.location.search).get('desktop') !== '1') return;
+    try { localStorage.setItem('jarvis.desktop.handsFree', String(handsFree)); }
+    catch { /* Storage may be unavailable; voice still works for this session. */ }
+  }, [handsFree]);
   const [voiceAwake, setVoiceAwake] = useState(false);
   const [voiceNotice, setVoiceNotice] = useState('');
   const [backendStatus, setBackendStatus] = useState<'checking' | 'connected' | 'offline'>('checking');

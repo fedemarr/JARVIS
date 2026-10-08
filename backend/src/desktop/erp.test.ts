@@ -9,6 +9,7 @@ import { ErpBrowser,ERP_ORIGIN,selectErpTicket } from './erp';
 test('ERP: selección exacta, siguiente pendiente y títulos ambiguos',()=>{
   const rows=[{id:'100',number:'#3',title:'Cerrado',module:'',priority:'',state:'Cerrado'},{id:'200',number:'#2',title:'Factura A',module:'',priority:'alta',state:'Abierto'},{id:'300',number:'#1',title:'Factura B',module:'',priority:'',state:'En progreso'}];
   assert.equal(selectErpTicket(rows,'siguiente')?.id,'200');assert.equal(selectErpTicket(rows,'#1')?.id,'300');assert.equal(selectErpTicket(rows,'Factura A')?.id,'200');assert.throws(()=>selectErpTicket(rows,'Factura'),/varios/);assert.throws(()=>selectErpTicket(rows,'999'),/No encontré/);
+  assert.equal(selectErpTicket([{...rows[1],title:'Dotacion'}],'Dotación')?.id,'200');
 });
 test('ERP: bandeja, modal y descarga real del navegador en carpeta nueva, sin ejecutar HTML',async()=>{
   const root=await fs.mkdtemp(path.join(os.tmpdir(),'jarvis-erp-'));const project=path.join(root,'project');await fs.mkdir(project);const browser=await chromium.launch({headless:true});

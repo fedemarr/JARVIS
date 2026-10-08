@@ -7,6 +7,7 @@ import { TicketImport } from './components/TicketImport';
 import { DesktopPanel } from './components/DesktopPanel';
 import { apiFetch } from './lib/api';
 import { desktopConnected } from './lib/desktop';
+import { parseTicketCommand } from './lib/ticketCommand';
 import { useAccess } from './components/AccessGate';
 import { MicButton } from './components/MicButton';
 import { ToolCard } from './components/ToolCard';
@@ -39,10 +40,7 @@ function App() {
   const commandBusyRef = useRef(false);
   const localNoticeVoiceRef=useRef<(text:string)=>void>(()=>{});
   const routeTicket = (text:string) => {
-    const direct=/^(?:(?:por favor|jarvis)[, :]+)?(?:resolv[eé]|resolver|resuelve|implement[aá]|hac[eé])(?:\s|[:,]).{0,100}\bticket\b/i.test(text);
-    const enterErp=/\b(?:entr[aá]|abr[ií]|anda|and[aá])(?:\s|[,]).{0,60}ohlimpia.{0,100}\bticket\b/i.test(text);
-    const listErp=/ohlimpia|erp/i.test(text) && /\btickets\b/i.test(text) && /qu[eé]|ver|mostr|list|busc/i.test(text);
-    if(!direct && !enterErp && !listErp)return false;
+    if(!parseTicketCommand(text))return false;
     if(!desktopConnected()){addSystemMessage('Conectá esta PC para ejecutar tickets con Claude Code.');return true;}
     window.dispatchEvent(new CustomEvent('jarvis-run-ticket',{detail:text}));
     return true;

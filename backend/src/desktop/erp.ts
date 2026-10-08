@@ -12,9 +12,10 @@ export type ErpTicket={id:string;number:string;title:string;module:string;priori
 export function selectErpTicket(tickets:ErpTicket[],selector:string) {
   const wanted=selector.trim().replace(/^#/,'');
   if(/^(?:siguiente|pr[oó]ximo)$/i.test(wanted))return tickets.find(t=>/^(?:Abierto|En progreso)$/i.test(t.state));
-  const exact=tickets.filter(t=>t.id===wanted || t.number.replace(/^#/,'')===wanted || t.title.toLowerCase()===wanted.toLowerCase());
+  const normalized=(value:string)=>value.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase();
+  const exact=tickets.filter(t=>t.id===wanted || t.number.replace(/^#/,'')===wanted || normalized(t.title)===normalized(wanted));
   if(exact.length===1)return exact[0];
-  const matches=tickets.filter(t=>t.title.toLowerCase().includes(wanted.toLowerCase()));
+  const matches=tickets.filter(t=>normalized(t.title).includes(normalized(wanted)));
   if(matches.length===1)return matches[0];
   throw new ErpError(matches.length>1?'Hay varios tickets con ese nombre. Elegí uno de la lista.':'No encontré ese ticket en la bandeja.');
 }

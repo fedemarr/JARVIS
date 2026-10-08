@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { ticketFetch } from '../lib/desktop';
+import { parseTicketCommand } from '../lib/ticketCommand';
 
 type Job={id:string;status:string;message:string;summary?:string;diff?:string;files?:string[];checks?:{name:string;status:string;output:string}[]};
 type ErpTicket={id:string;number:string;title:string;priority:string;state:string};
@@ -38,19 +39,19 @@ export function TicketAgentPanel({ticketPath}:{ticketPath:string}) {
       const data=await response.json();if(!response.ok)throw new Error(data.message);
       setJobs(previous=>[data,...previous]);setNotice('Ticket iniciado. Podés seguir usando el chat mientras Claude trabaja.');
       window.dispatchEvent(new CustomEvent('jarvis-ticket-notice',{detail:'Inicié el ticket con Claude Code. Verás los cambios y las comprobaciones en el panel de OhlimpiaERP.'}));
-    } catch(e){setNotice(e instanceof Error?e.message:'No pude iniciar el ticket.');}
+    } catch(e){const message=e instanceof Error?e.message:'No pude iniciar el ticket.';setNotice(message);window.dispatchEvent(new CustomEvent('jarvis-ticket-notice',{detail:message}));}
     finally{setBusy(false);}
   }
   useEffect(()=>{
     const request=(event:Event)=>{
       const text=(event as CustomEvent<string>).detail;setInstruction(text);
-      if(/ohlimpia|erp/i.test(text) && /\btickets\b/i.test(text) && /qu[eé]|ver|mostr|list|busc/i.test(text)) {void erpAction('list');return;}
-      const selector=text.match(/\bticket\s+(?:n[uú]mero\s+|n[º°]?\s*)?#?(\d+)\b/i)?.[1] || (/\b(?:siguiente|pr[oó]ximo)\s+ticket\b|\bticket\s+(?:siguiente|pr[oó]ximo)\b/i.test(text)?'siguiente':undefined);
-      if(/ohlimpia|bandeja|web/i.test(text) && !selector && /entr[aá]|abr[ií]|descarg|bandeja/i.test(text)) {
-        const message='Indicame el número del ticket de la web o decí «el siguiente ticket».';
+      const command=parseTicketCommand(text);if(!command)return;
+      if(command.action==='list'){void erpAction('list');return;}
+      if(!command.selector && (command.erp || !ticketPath)) {
+        const message='Indicame el nombre o número del ticket de la web, o decí «el siguiente ticket».';
         setNotice(message);window.dispatchEvent(new CustomEvent('jarvis-ticket-notice',{detail:message}));return;
       }
-      const fromErp=selector && /ohlimpia|erp|web|bandeja|siguiente|pr[oó]ximo/i.test(text)?selector:undefined;
+      const fromErp=command.selector && (command.erp || !ticketPath)?command.selector:undefined;
       void start(text,fromErp);
     };
     window.addEventListener('jarvis-run-ticket',request);

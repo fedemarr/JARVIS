@@ -11,13 +11,14 @@
     "llm:test": "tsx src/llm/test.ts",
     "n8n:test": "tsx src/n8n/test.ts",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "test": "tsx --test src/cloud/backend.test.ts src/desktop/desktop.test.ts src/internet/internet.test.ts"
+    "test": "tsx --test src/cloud/backend.test.ts src/desktop/desktop.test.ts src/desktop/tickets.test.ts src/internet/internet.test.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.39.0",
     "@fastify/cors": "^11.3.0",
     "@fastify/static": "^10.1.5",
     "@google/generative-ai": "^0.24.1",
+    "@modelcontextprotocol/sdk": "^1.32.1",
     "@neondatabase/serverless": "^1.2.0",
     "better-sqlite3": "^13.0.3",
     "cheerio": "^1.2.0",

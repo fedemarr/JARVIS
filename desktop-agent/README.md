@@ -20,8 +20,18 @@ Ver [voice-local](../voice-local/README.md). La voz Alex se usa automáticamente
 
 ## Alcance actual
 
-La conexión funciona desde la web abierta en la misma PC que ejecuta el agente. En el celular o en otra computadora el chat e internet siguen funcionando con voz del navegador; conectar la PC de casa remotamente requiere la siguiente etapa. No hay ejecución de tests, modificaciones, integración con Claude Code/Codex, push/deploy remoto ni lectura automática solicitada por el modelo. No se abrieron puertos del router. `127.0.0.1:3002` queda como interfaz opcional de desarrollo, no como entrada requerida.
+La conexión funciona desde la web abierta en la misma PC que ejecuta el agente. En el celular o en otra computadora el chat e internet siguen funcionando con voz del navegador; conectar la PC de casa remotamente requiere la siguiente etapa. El ejecutor de tickets integra Claude Code para preparar cambios en copias separadas y ejecutar pruebas/build. No integra automáticamente cambios en el original, publica OhlimpiaERP ni cierra tickets. No se abrieron puertos del router. `127.0.0.1:3002` queda como interfaz opcional de desarrollo, no como entrada requerida.
 
-La siguiente etapa necesita vinculación con credenciales individuales revocables, heartbeat y cola persistente de trabajos de lectura entre el agente y la nube. Probar sus migraciones en una rama aislada de Neon antes de llevarlas a producción. Agregar ejecución o escritura exige políticas y aprobación explícita por operación, además de una autenticación adecuada para el acceso remoto.
+La siguiente etapa necesita vinculación con credenciales individuales revocables, heartbeat y cola persistente de trabajos entre el agente y la nube. Probar sus migraciones en una rama aislada de Neon antes de llevarlas a producción. La ejecución actual se limita a trabajos iniciados por Federico y a herramientas de archivos en la copia del ticket; ampliar el control remoto requiere autenticación por dispositivo y políticas para cada capacidad.
 
 Validación: `npm test -w backend`, `npm run typecheck`, `npm run build`, `node frontend/ui-smoke.cjs`.
+
+## Tickets con Claude Code
+
+En la web, elegí OhlimpiaERP, seleccioná un archivo .md/.html y usá **Resolver ticket con Claude**. También podés pegar una tarea concreta en el panel. El chat reconoce pedidos que comienzan con «Resolvé el ticket…» y los deriva al ejecutor. No hay que abrir ni copiar mensajes a la terminal de Claude.
+
+Claude Code debe estar instalado mediante npm y tener una sesión iniciada en esta PC. Se usa su autenticación local, sin exportar claves a la web ni heredar ANTHROPIC_API_KEY del servidor. El consumo y los límites dependen de esa cuenta. La integración usa [modo print y herramientas MCP](https://code.claude.com/docs/en/cli-reference): se deshabilitan herramientas nativas, Chrome, otros MCP y configuraciones de sesión. El MCP de Jarvis solo permite listar, leer por líneas, buscar texto y escribir/editar archivos permitidos en la copia; bloquea enlaces, secretos y cambios de configuración. No se entrega una terminal libre.
+
+Los trabajos se guardan en `data/ticket-jobs/<id>`. El snapshot conserva el código actual, incluidos cambios locales, sin modificar el original; es un repositorio Git independiente sin remoto. Se instala desde el lockfile con scripts de instalación deshabilitados. Para OhlimpiaERP se ejecutan Vitest excluyendo staging y e2e, y Vite build; las comprobaciones pendientes se muestran como tales. Una comprobación fallida provoca un intento de corrección antes del resultado final. El resultado incluye resumen, diff y salida de pruebas, con botón para abrir la copia en VS Code. Solo hay una tarea activa, con cancelación y límite de veinte minutos; los cambios parciales se conservan.
+
+La credencial para iniciar/consultar/cancelar trabajos o abrir VS Code tiene una firma de propósito distinta de la credencial de lectura/voz. Las tareas requieren una acción explícita del usuario en la web autenticada.

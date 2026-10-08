@@ -13,7 +13,7 @@ async function main() {
   process.env.ALLOWED_ORIGINS='https://jarvis-eta-blue.vercel.app,http://127.0.0.1:3002,http://localhost:3002';
   const app=buildDesktopApp(config,root);
   await app.listen({host:'127.0.0.1',port:3002});
-  console.log('Jarvis Desktop listo en http://127.0.0.1:3002 (solo lectura).');
+  console.log('Conector local de Jarvis listo en 127.0.0.1:3002: lectura, voz y tickets en copias separadas.');
   for(const signal of ['SIGINT','SIGTERM'] as const) process.once(signal,async()=>{await app.close();});
 }
 main().catch(()=>{console.error('No se pudo iniciar Jarvis Desktop. Revisá data/desktop-projects.json y el puerto 3002.');process.exitCode=1;});

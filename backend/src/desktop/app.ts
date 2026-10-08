@@ -8,6 +8,7 @@ import { registerAuth } from '../security/auth';
 import { ReadOnlyProjects, DesktopConfig } from './projects';
 import { LocalVoice } from './voice';
 import { BRIDGE_ORIGIN, validBridgeToken } from '../security/bridge';
+import { TicketRunner } from './tickets';
 
 const query = z.object({project:z.string().min(1).max(40),path:z.string().max(500).default('.')}).strict();
 export function buildDesktopApp(config:DesktopConfig,root:string,cloud='https://jarvis-eta-blue.vercel.app') {
@@ -16,9 +17,14 @@ export function buildDesktopApp(config:DesktopConfig,root:string,cloud='https://
   const app = Fastify({bodyLimit:128*1024,logger:{redact:['req.headers.cookie','req.headers.authorization']}});
   const projects = new ReadOnlyProjects(config);
   const voice = new LocalVoice(root);
+  const tickets = new TicketRunner(config,root);
   let cloudSession:Promise<string>|undefined;
   registerAuth(app,{bridgeAuthorized:(request)=>{
     const url=request.url.split('?')[0];
+    if(/^\/api\/bridge\/tickets(?:\/status|\/[a-f0-9-]{36}\/(?:cancel|open))?$/.test(url)) {
+      const allowed=request.method==='GET'?/^\/api\/bridge\/tickets(?:\/status)?$/.test(url):request.method==='POST' && (url==='/api/bridge/tickets' || /\/(?:cancel|open)$/.test(url));
+      return allowed && request.headers.origin===BRIDGE_ORIGIN && validBridgeToken((request.headers.authorization || '').replace(/^Bearer /,''),process.env.JARVIS_ACCESS_KEY!,Date.now(),'tickets');
+    }
     const allowed=request.method==='GET'?/^\/api\/bridge\/(?:desktop\/(?:status|files|read|git)|voice\/status)$/:request.method==='POST' && url==='/api/bridge/voice/synthesize';
     return !!allowed && request.headers.origin===BRIDGE_ORIGIN && validBridgeToken((request.headers.authorization || '').replace(/^Bearer /,''),process.env.JARVIS_ACCESS_KEY!);
   }});
@@ -34,6 +40,16 @@ export function buildDesktopApp(config:DesktopConfig,root:string,cloud='https://
   app.get('/api/desktop/read',async(request) => { const args=query.parse(request.query); return projects.read(args.project,args.path); });
   app.get('/api/desktop/git',async(request) => { const args=query.parse(request.query); return projects.git(args.project); });
   app.get('/api/voice/status',async() => voice.status());
+  for(const prefix of ['/api/tickets','/api/bridge/tickets']) {
+    app.get(prefix+'/status',async()=>tickets.status());
+    app.get(prefix,async()=>tickets.list());
+    app.post(prefix,async(request,reply)=>{
+      try {return reply.code(202).send(await tickets.start(request.body));}
+      catch(e){return reply.code(400).send({message:e instanceof Error?e.message:'No pude iniciar el ticket.'});}
+    });
+    app.post<{Params:{id:string}}>(prefix+'/:id/cancel',async(request)=>tickets.cancel(request.params.id));
+    app.post<{Params:{id:string}}>(prefix+'/:id/open',async(request)=>tickets.open(request.params.id));
+  }
   app.post('/api/voice/synthesize',async(request,reply) => {
     const {text} = z.object({text:z.string().trim().min(1).max(220)}).strict().parse(request.body);
     if (!voice.status().available || voice.status().busy) return reply.code(503).send({message:'Voz local no disponible; usá la voz del navegador.'});
@@ -83,6 +99,6 @@ export function buildDesktopApp(config:DesktopConfig,root:string,cloud='https://
   app.register(fastifyStatic,{root:path.join(root,'frontend','dist'),prefix:'/'});
   app.setNotFoundHandler((request,reply) => request.url.startsWith('/api/') ? reply.code(404).send({message:'Operación no disponible.'}) : reply.sendFile('index.html'));
   app.addHook('onReady',async()=>voice.start());
-  app.addHook('onClose',async()=>voice.close());
+  app.addHook('onClose',async()=>{tickets.close();voice.close();});
   return app;
 }

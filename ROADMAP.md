@@ -36,8 +36,11 @@ en segundo plano; no hace falta abrir una interfaz Desktop aparte. Se corrigió 
 activación de manos libres durante respuestas para que espere sin cortar la lectura.
 Kokoro ONNX con voz Alex en español corre en CPU; se comprobó generación de WAV
 y reproducción desde la J. Se verificaron Git de OhlimpiaERP, bloqueo de secretos
-y respuesta real por el proxy. No hay todavía vinculación remota del celular,
-trabajos persistentes, cambios automáticos ni ejecución de Claude Code/Codex.
+y respuesta real por el proxy. No hay todavía vinculación remota del celular.
+El 8 de octubre se agregó un ejecutor persistente de tickets con Claude Code:
+copia independiente del código actual, herramientas MCP acotadas, diff,
+pruebas unitarias/build, un intento de reparación y apertura en VS Code.
+La integración en el proyecto original y el cierre de tickets siguen siendo manuales.
 
 Prioridad confirmada por Federico: resolver tickets del trabajo. Luego ampliar
 a desarrollo, vida social, estudio y marketing de su empresa.
@@ -54,8 +57,8 @@ suben arreglos y mejoras; Federico descarga tickets .md y .html a la carpeta
 del ERP y los resuelve con Claude Code siguiendo lógica, estructura y buenas
 prácticas. La interfaz de Jarvis permite importar el texto de esos archivos,
 revisarlo en el editor y enviarlo al chat para análisis. No hay conexión directa
-con la nube del ERP ni con Claude Code todavía. Falta la ruta del proyecto y un
-ticket representativo para verificar una solución real.
+con la nube del ERP. La ruta local está configurada y el ejecutor de Claude Code
+ya resolvió un ticket de prueba; faltan tickets de negocio representativos.
 
 Además, elegir actividades cotidianas y probarlas de punta a punta. Posibles casos:
 crear una tarea y recuperarla al reiniciar; guardar una preferencia y recordarla;

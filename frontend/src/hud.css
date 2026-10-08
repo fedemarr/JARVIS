@@ -103,3 +103,8 @@ body { background: #020817; color: #d6e6ff; }
 .desktop-panel button { color: #8dddff; font-size: 12px; padding: 4px 6px; }
 .desktop-files { max-height: 105px; overflow: auto; list-style: none; padding: 0; margin: 0; }
 .desktop-files button { text-align: left; width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ticket-agent { margin-top: 16px; padding-top: 14px; border-top: 1px solid rgba(75,205,255,.25); }
+.ticket-agent textarea { width: 100%; box-sizing: border-box; padding: 10px; background: #061322; color: #d8f3ff; border: 1px solid #23536c; border-radius: 7px; resize: vertical; font: inherit; }
+.ticket-job { margin-top: 12px; padding: 10px; border: 1px solid #23536c; border-radius: 8px; }
+.ticket-job pre { white-space: pre-wrap; overflow-wrap: anywhere; max-height: 300px; overflow: auto; font-size: 11px; }
+.ticket-job details { margin-top: 10px; }

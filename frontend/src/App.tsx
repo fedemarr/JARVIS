@@ -6,6 +6,7 @@ import { Orb } from './components/Orb';
 import { TicketImport } from './components/TicketImport';
 import { DesktopPanel } from './components/DesktopPanel';
 import { apiFetch } from './lib/api';
+import { desktopConnected } from './lib/desktop';
 import { useAccess } from './components/AccessGate';
 import { MicButton } from './components/MicButton';
 import { ToolCard } from './components/ToolCard';
@@ -36,6 +37,17 @@ function App() {
   } = useChat();
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const commandBusyRef = useRef(false);
+  const routeTicket = (text:string) => {
+    if(!/^(?:(?:por favor|jarvis)[, :]+)?(?:resolv[eé]|resolver|resuelve|implement[aá]|hac[eé])(?:\s|[:,]).{0,100}\bticket\b/i.test(text))return false;
+    if(!desktopConnected()){addSystemMessage('Conectá esta PC para ejecutar tickets con Claude Code.');return true;}
+    window.dispatchEvent(new CustomEvent('jarvis-run-ticket',{detail:text}));
+    return true;
+  };
+  useEffect(()=>{
+    const notice=(event:Event)=>addSystemMessage((event as CustomEvent<string>).detail);
+    window.addEventListener('jarvis-ticket-notice',notice);
+    return()=>window.removeEventListener('jarvis-ticket-notice',notice);
+  },[addSystemMessage]);
 
   const voice = useMemo(() => createBrowserVoice(), []);
 
@@ -106,6 +118,7 @@ function App() {
 
   const commandRef = useRef<(text: string) => Promise<void>>(async () => {});
   commandRef.current = async (text: string) => {
+    if(routeTicket(text)){setInput('');return;}
     if (commandBusyRef.current) return;
     commandBusyRef.current = true;
     try {
@@ -186,6 +199,7 @@ function App() {
     e.preventDefault();
     const text = input.trim();
     if (!text || isLoading || commandBusyRef.current) return;
+    if(routeTicket(text)){setInput('');return;}
     commandBusyRef.current = true;
     try {
     setInput('');

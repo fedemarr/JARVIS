@@ -21,8 +21,9 @@ del navegador. El conector de la PC funciona en segundo plano; se puede iniciar
 con Windows mediante `desktop-agent/install-startup.ps1`. Ver [Desktop Agent](desktop-agent/README.md) y
 [instalación de voz](voice-local/README.md).
 
-El acceso a la PC desde el celular, la escritura y la ejecución de trabajos
-siguen pendientes. La interfaz local usa la memoria existente de Neon mediante
+El acceso a la PC desde el celular sigue pendiente. La escritura de tickets y
+las comprobaciones locales están disponibles en copias separadas con Claude Code.
+La interfaz local usa la memoria existente de Neon mediante
 HTTPS; esta versión no agrega tablas ni cambia la base de producción.
 
 ```
@@ -100,14 +101,14 @@ del sistema operativo. El permiso del micrófono debe concederlo el usuario.
 Las pruebas automatizadas simulan reconocimiento y audio: falta verificar el
 micrófono y el reconocimiento real en el equipo de Federico.
 En la nube están disponibles memoria, tareas, notas y análisis
-de tickets; el control de computadoras y la conexión con Claude Code siguen pendientes.
+de tickets; el conector local integra Claude Code para preparar cambios verificables.
 
 La interfaz tiene una consola de mando con un núcleo animado y accesos para
 OhlimpiaERP, tareas, estudio y marketing. Los accesos preparan mensajes editables.
 **Importar ticket** carga archivos `.md` o `.html` (hasta 64 KB y 32.000 caracteres)
 en el editor; el contenido se envía al modelo cuando apretás Enviar. El HTML se
-convierte a texto. Todavía no hay integración directa con la nube de OhlimpiaERP
-ni con Claude Code.
+convierte a texto. No hay integración directa con la nube de OhlimpiaERP;
+el panel local permite resolver el ticket con Claude Code.
 
 En Windows, usá `npm.cmd run dev` y abrí `http://localhost:3000` para desarrollo.
 Después de compilar, `npm.cmd run start` sirve la interfaz en el puerto 3001.
@@ -189,3 +190,7 @@ compila; falla solo si no hay key).
 ESP32, wake word, app mobile, multiusuario, pagos, fine-tuning, modelos
 locales, WhatsApp (ver `JARVIS_N8N_PROMPT.md` §10).
 
+
+### Resolver tickets desde Jarvis
+
+La web integra Claude Code instalado y autenticado en la PC: seleccioná OhlimpiaERP y un ticket .md/.html, y pulsá «Resolver ticket con Claude». Claude prepara el código en una copia separada; Jarvis ejecuta comprobaciones y muestra diff, pruebas y resumen. «Abrir cambios en VS Code» abre esa copia para revisar e integrar. No publica OhlimpiaERP ni cierra tickets. Ver [la configuración del ejecutor](desktop-agent/README.md#tickets-con-claude-code).

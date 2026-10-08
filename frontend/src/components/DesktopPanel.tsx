@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { desktopFetch, refreshDesktop } from '../lib/desktop';
+import { TicketAgentPanel } from './TicketAgentPanel';
 
 type Project = {id:string;name:string};
 type FileEntry = {name:string;path:string;directory:boolean};
@@ -14,6 +15,7 @@ export function DesktopPanel({onImport,disabled}:{onImport:(text:string)=>void;d
   const [busy,setBusy]=useState(false);
   const [natural,setNatural]=useState(false);
   const [voiceStarting,setVoiceStarting]=useState(false);
+  const [ticketPath,setTicketPath]=useState('');
   useEffect(()=>{
     let active=true;
     let online=false;
@@ -33,6 +35,7 @@ export function DesktopPanel({onImport,disabled}:{onImport:(text:string)=>void;d
     return()=>{active=false;};
   },[project,directory,connected]);
   async function importContext(kind:'git'|'read',path?:string) {
+    if(kind==='read' && project==='ohlimpiaerp' && /\.(md|html?)$/i.test(path || ''))setTicketPath(path!);
     setBusy(true);setNotice('');
     try {
       const response=await desktopFetch('/api/desktop/'+kind+'?'+new URLSearchParams({project,path:path || '.'}),{signal:AbortSignal.timeout(15000)});
@@ -51,6 +54,7 @@ export function DesktopPanel({onImport,disabled}:{onImport:(text:string)=>void;d
       <div className="desktop-folder"><span>{directory==='.'?'Carpeta principal':directory}</span>{directory!=='.' && <button type="button" onClick={()=>setDirectory(directory.split('/').slice(0,-1).join('/') || '.')}>↑ Volver</button>}</div>
       <ul className="desktop-files">{files.map((file)=><li key={file.path}><button type="button" disabled={busy || disabled} onClick={()=>file.directory?setDirectory(file.path):void importContext('read',file.path)}>{file.directory?'▸':'↗'} {file.name}</button></li>)}</ul>
       {notice && <p role="status">{notice}</p>}
+      <TicketAgentPanel ticketPath={ticketPath} />
     </>}
   </section>;
 }

@@ -59,6 +59,8 @@ test('API local: sesión obligatoria, origen/host, sin comandos ni escritura', a
     assert.equal((await app.inject({method:'POST',url:'/api/bridge/chat',headers:bridge,payload:{message:'hello'}})).statusCode,401,'El token solo permite lectura y voz');
     assert.equal((await app.inject({method:'POST',url:'/api/bridge/tickets',headers:bridge,payload:{project:'ohlimpiaerp',instruction:'Resolver este ticket.'}})).statusCode,401,'La credencial de lectura no puede iniciar tareas');
     const ticketAuth={...headers,origin:BRIDGE_ORIGIN,authorization:'Bearer '+createBridgeToken(process.env.JARVIS_ACCESS_KEY!,Date.now(),'tickets')};
+    for(const action of ['plan','execute'])assert.equal((await app.inject({method:'POST',url:'/api/bridge/tickets/migrations/'+action,headers:bridge,payload:{file:'v198_test.sql'}})).statusCode,401,'Lectura/voz no ejecuta SQL');
+    assert.equal((await app.inject({method:'POST',url:'/api/bridge/tickets/migrations/execute',headers:ticketAuth,payload:{file:'v198_test.sql',sha:'a'.repeat(64),target:'production'}})).statusCode,400,'Producción requiere revisión explícita');
     for(const action of ['publish-plan','publish']){
       const url='/api/bridge/tickets/11111111-1111-4111-8111-111111111111/'+action;
       assert.equal((await app.inject({method:'POST',url,headers:bridge,payload:{}})).statusCode,401,'Lectura/voz no puede publicar');

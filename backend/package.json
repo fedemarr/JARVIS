@@ -11,7 +11,7 @@
     "llm:test": "tsx src/llm/test.ts",
     "n8n:test": "tsx src/n8n/test.ts",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "test": "tsx --test src/cloud/backend.test.ts src/desktop/desktop.test.ts src/desktop/tickets.test.ts src/desktop/erp.test.ts src/internet/internet.test.ts"
+    "test": "tsx --test src/cloud/backend.test.ts src/desktop/desktop.test.ts src/desktop/tickets.test.ts src/desktop/migrations.test.ts src/desktop/erp.test.ts src/internet/internet.test.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.39.0",
@@ -27,6 +27,7 @@
     "ignore": "^7.0.6",
     "ipaddr.js": "^2.5.0",
     "mathjs": "^15.2.0",
+    "pg": "^8.23.1",
     "playwright": "^1.62.1",
     "undici": "^7.30.0",
     "zod": "^3.25.76"
@@ -34,6 +35,7 @@
   "devDependencies": {
     "@types/better-sqlite3": "^7.6.11",
     "@types/node": "^20.17.0",
+    "@types/pg": "^8.23.1",
     "tsx": "^4.19.2",
     "typescript": "^5.3.3"
   }

@@ -10,6 +10,7 @@ import { LocalVoice } from './voice';
 import { BRIDGE_ORIGIN, validBridgeToken } from '../security/bridge';
 import { TicketRunner } from './tickets';
 import { ErpBrowser, ErpError } from './erp';
+import { MigrationRunner } from './migrations';
 
 const query = z.object({project:z.string().min(1).max(40),path:z.string().max(500).default('.')}).strict();
 export function buildDesktopApp(config:DesktopConfig,root:string,cloud='https://jarvis-eta-blue.vercel.app') {
@@ -19,10 +20,15 @@ export function buildDesktopApp(config:DesktopConfig,root:string,cloud='https://
   const projects = new ReadOnlyProjects(config);
   const voice = new LocalVoice(root);
   const tickets = new TicketRunner(config,root);
+  const migrations = new MigrationRunner(config,root);
   const erp = new ErpBrowser(root,config);
   let cloudSession:Promise<string>|undefined;
   registerAuth(app,{bridgeAuthorized:(request)=>{
     const url=request.url.split('?')[0];
+    if(/^\/api\/bridge\/tickets\/migrations(?:\/(?:plan|execute))?$/.test(url)){
+      const allowed=request.method==='GET'?url.endsWith('/migrations'):request.method==='POST'&&/\/(?:plan|execute)$/.test(url);
+      return allowed && request.headers.origin===BRIDGE_ORIGIN && validBridgeToken((request.headers.authorization || '').replace(/^Bearer /,''),process.env.JARVIS_ACCESS_KEY!,Date.now(),'tickets');
+    }
     if(/^\/api\/bridge\/tickets\/erp\/(?:status|list|connect|download|run)$/.test(url)) {
       const allowed=request.method==='GET'?/\/(?:status|list)$/.test(url):request.method==='POST' && /\/(?:connect|download|run)$/.test(url);
       return allowed && request.headers.origin===BRIDGE_ORIGIN && validBridgeToken((request.headers.authorization || '').replace(/^Bearer /,''),process.env.JARVIS_ACCESS_KEY!,Date.now(),'tickets');
@@ -47,6 +53,19 @@ export function buildDesktopApp(config:DesktopConfig,root:string,cloud='https://
   app.get('/api/desktop/git',async(request) => { const args=query.parse(request.query); return projects.git(args.project); });
   app.get('/api/voice/status',async() => voice.status());
   for(const prefix of ['/api/tickets','/api/bridge/tickets']) {
+    app.get(prefix+'/migrations',async()=>migrations.list());
+    app.post(prefix+'/migrations/plan',async(request,reply)=>{
+      try{return await migrations.plan(z.object({file:z.string().max(200)}).strict().parse(request.body).file);}
+      catch(error){return reply.code(400).send({message:error instanceof Error?error.message:'No pude revisar el SQL.'});}
+    });
+    app.post(prefix+'/migrations/execute',async(request,reply)=>{
+      try{
+        const input=z.object({file:z.string().max(200),sha:z.string().regex(/^[a-f0-9]{64}$/),target:z.enum(['staging','production']),dryRun:z.boolean().optional(),reviewed:z.boolean().optional()}).strict().parse(request.body);
+        if(input.target==='production'&&input.reviewed!==true)throw new Error('Primero revisá el SQL y confirmá su aplicación.');
+        if((await tickets.list()).some(job=>['preparing','coding','checking'].includes(job.status)||job.publication?.status==='publishing'))throw new Error('Esperá a que termine el ticket o deploy en curso antes de ejecutar SQL.');
+        return await migrations.execute(input.file,input.sha,input.target,input.dryRun===true);
+      }catch(error){return reply.code(400).send({message:error instanceof Error?error.message:'No pude ejecutar la migración.'});}
+    });
     app.get(prefix+'/erp/status',async()=>erp.status());
     app.get(prefix+'/erp/list',async()=>erp.list());
     app.post(prefix+'/erp/connect',async()=>erp.connect());

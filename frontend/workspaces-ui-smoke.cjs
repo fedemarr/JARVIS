@@ -29,6 +29,9 @@ const server=http.createServer((req,res)=>{
    else if(url.pathname==='/api/bridge/tickets/erp/list')value=erp;
    else if(url.pathname==='/api/bridge/tickets/erp/run'){submitted=route.request().postDataJSON();value={id:'22222222-2222-4222-8222-222222222222',status:'ready',message:'Ticket de prueba preparado.'};jobs=[value,...jobs];}
    else if(url.pathname==='/api/bridge/tickets')value=jobs;
+   else if(url.pathname==='/api/bridge/tickets/migrations')value={files:['v198_config_listas_capacitaciones.sql'],busy:false};
+   else if(url.pathname==='/api/bridge/tickets/migrations/plan')value={file:'v198_config_listas_capacitaciones.sql',sha:'a'.repeat(64),sql:'INSERT INTO public.config_listas VALUES (1);',statements:1,configured:true,connectionMessage:''};
+   else if(url.pathname==='/api/bridge/tickets/migrations/execute'){const body=route.request().postDataJSON();assert.equal(body.sha,'a'.repeat(64));if(body.target==='production')assert.equal(body.reviewed,true);value={status:body.target==='staging'?'tested':'applied',message:body.target==='staging'?'Prueba revertida.':'Migración aplicada.',at:'2026-10-08'};}
    else if(url.pathname.endsWith('/open'))value={opened:true,file:'src/dotacion.js'};
    else if(url.pathname.endsWith('/publish-plan'))value={token:'a'.repeat(64),branch:'main',remote:'https://github.com/example/ohlimpiaerp.git',project:'ohlimpiaerp',files:['src/dotacion.js'],diff:'Cambios de prueba'};
    else if(url.pathname.endsWith('/publish')){publishRequests++;assert.equal(route.request().postDataJSON().reviewed,true);assert.equal(route.request().postDataJSON().token,'a'.repeat(64));jobs[0]={...jobs[0],publication:{status:'published',message:'Commit subido y despliegue completado.',commit:'a'.repeat(40),url:'https://test-deployment.vercel.app'}};value=jobs[0];}
@@ -43,6 +46,11 @@ const server=http.createServer((req,res)=>{
   const composer=await page.locator('.command-composer').boundingBox();assert(composer.y+composer.height<=1000);
   await page.screenshot({path:'artifacts/workspace-communication.png'});
   await sector('Tickets').click();assert(await page.locator('.erp-inbox').isVisible());assert(!(await chat.isVisible()));assert.equal(await page.locator('.ticket-job').count(),1);
+  const sqlPanel=page.getByRole('region',{name:'Migraciones SQL'});
+  await sqlPanel.getByRole('button',{name:'Revisar SQL',exact:true}).click();
+  const applySql=sqlPanel.getByRole('button',{name:'Aplicar SQL',exact:true});await applySql.waitFor();assert(await applySql.isDisabled());
+  await sqlPanel.getByRole('button',{name:'Probar en staging',exact:true}).click();await sqlPanel.getByText('Prueba revertida.',{exact:true}).waitFor();assert(await applySql.isDisabled());
+  await sqlPanel.getByRole('checkbox',{name:/Revisé este SQL/}).check();await applySql.click();await sqlPanel.getByRole('button',{name:'SQL aplicado',exact:true}).waitFor();
   await page.getByRole('button',{name:'Abrir cambios en VS Code',exact:true}).click();await page.getByText('Abrí OhlimpiaERP en VS Code y el archivo src/dotacion.js.').first().waitFor();
   assert(await page.getByText('Informe para Lautaro · cambios y qué probar',{exact:true}).isVisible());
   await page.getByRole('button',{name:'Commit y deploy',exact:true}).click();

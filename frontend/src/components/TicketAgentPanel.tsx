@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { ticketFetch, readErpTickets } from '../lib/desktop';
 import { parseTicketCommand, setTicketContext } from '../lib/ticketCommand';
 import { ticketReport } from '../lib/ticketReport';
+import { SqlMigrationsPanel } from './SqlMigrationsPanel';
 
 type Job={id:string;ticket?:{title:string;number?:string;module?:string};status:string;message:string;editorOpened?:boolean;editorError?:string;summary?:string;diff?:string;files?:string[];checks?:{name:string;status:string;output:string}[];publication?:{status:string;message:string;commit?:string;url?:string}};
 type PublishPlan={token:string;branch:string;remote:string;project:string;files:string[];diff:string};
@@ -126,6 +127,7 @@ export function TicketAgentPanel({ticketPath}:{ticketPath:string}) {
     <p role="status">{notice}</p>
     <p>Claude modifica tu proyecto original de OhlimpiaERP y ejecuta comprobaciones. El historial de Git y los cambios previos se conservan. No publica ni cierra el ticket automáticamente.</p>
     </div>
+    <SqlMigrationsPanel />
     <div className="ticket-executions"><div className="execution-heading"><div><span className="eyebrow">SEGUIMIENTO</span><h3>{activeJobs.length?'Trabajo en curso':'Último trabajo'}</h3></div><button type="button" aria-expanded={showHistory} onClick={()=>setShowHistory(value=>!value)}>{showHistory?'Ocultar historial':`Ver historial · ${jobs.length}`}</button></div>
     {jobs.length===0 && <div className="jobs-empty">Todavía no hay ejecuciones. Elegí un ticket para empezar.</div>}
     {visibleJobs.map(job=><article key={job.id} className={`ticket-job ticket-job-${job.status}`}>

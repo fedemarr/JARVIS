@@ -46,8 +46,14 @@ const server=http.createServer((req,res)=>{
   await sector('Computadora').click();assert(await page.getByRole('heading',{name:'Archivos y proyectos'}).isVisible());assert(!(await page.locator('.ticket-agent').isVisible()));await page.screenshot({path:'artifacts/workspace-computer.png'});
   await page.getByRole('button',{name:'↗ README.md',exact:true}).click();await chat.waitFor();assert((await chat.inputValue()).includes('Documentación del proyecto.'));
   await chat.fill('dotacion de los tickets q estan abiertos');await page.getByRole('button',{name:'Enviar mensaje',exact:true}).click();await page.waitForFunction(()=>document.querySelector('.ticket-agent')?.textContent.includes('Ticket iniciado'));assert.equal(submitted.selector,'465709685');assert.equal(chats,0);
-  await page.setViewportSize({width:390,height:844});
-  for(const name of ['Comunicación','Tickets','Computadora']){await sector(name).click();assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth||document.documentElement.scrollHeight>innerHeight),false);await page.screenshot({path:'artifacts/workspace-mobile-'+name.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase()+'.png'});}
+  for(const size of [{width:390,height:844},{width:700,height:900},{width:1280,height:720}]){
+   await page.setViewportSize(size);
+   for(const name of ['Comunicación','Tickets','Computadora']){
+    await sector(name).click();assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth||document.documentElement.scrollHeight>innerHeight),false);
+    if(name!=='Comunicación')assert.equal(await page.locator('.local-view').evaluate(el=>el.scrollTop),0,'Cada sector abre desde su encabezado');
+    if(size.width===390)await page.screenshot({path:'artifacts/workspace-mobile-'+name.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase()+'.png'});
+   }
+  }
   assert.deepEqual(errors,[]);console.log('PASS: tres sectores, historial colapsado, scroll independiente, archivos al chat, orden de ticket desde chat con panel oculto, escritorio y móvil. APIs y ejecución simuladas.');
  }finally{await browser.close();await new Promise(r=>server.close(r));}
 })().catch(e=>{console.error(e);process.exitCode=1});

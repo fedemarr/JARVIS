@@ -19,6 +19,8 @@ function App() {
   const access = useAccess();
   const [input, setInput] = useState('');
   const [activeArea, setActiveArea] = useState<'communication' | 'tickets' | 'computer'>('communication');
+  const localViewRef = useRef<HTMLElement>(null);
+  useEffect(() => { localViewRef.current?.scrollTo({ top: 0 }); }, [activeArea]);
   const prepareMessage = (text:string) => { setInput(text); setActiveArea('communication'); };
   const [coreGreeting, setCoreGreeting] = useState('');
   const [handsFree, setHandsFree] = useState(() => {
@@ -335,7 +337,7 @@ function App() {
         </div>
         </div>
         </div>
-        <section className="local-view" hidden={activeArea === 'communication'} aria-label={activeArea === 'tickets' ? 'Espacio de tickets' : 'Espacio de computadora'}>
+        <section ref={localViewRef} className="local-view" hidden={activeArea === 'communication'} aria-label={activeArea === 'tickets' ? 'Espacio de tickets' : 'Espacio de computadora'}>
           <DesktopPanel area={activeArea} onImport={(text) => { setInput(text); setActiveArea('communication'); }} disabled={isLoading} />
           <div className="ticket-import-area" hidden={activeArea !== 'tickets'}><TicketImport onImport={(text) => { setInput(text); setActiveArea('communication'); }} disabled={isLoading} /></div>
         </section>

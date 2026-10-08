@@ -2,6 +2,7 @@
 [hidden] { display: none !important; }
 html, body, #root { overflow: hidden; }
 .command-shell { height: 100dvh; overflow: hidden; grid-template-columns: 210px minmax(0, 1fr); }
+.command-main { flex: 1; overflow: hidden; }
 .command-sidebar { padding: 26px 16px 18px; }
 .brand { margin-bottom: 34px; }
 .personal-heading { margin-top: 24px; }

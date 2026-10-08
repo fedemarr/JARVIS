@@ -9,6 +9,7 @@ import { ReadOnlyProjects, DesktopConfig } from './projects';
 import { LocalVoice } from './voice';
 import { BRIDGE_ORIGIN, validBridgeToken } from '../security/bridge';
 import { TicketRunner } from './tickets';
+import { ErpBrowser, ErpError } from './erp';
 
 const query = z.object({project:z.string().min(1).max(40),path:z.string().max(500).default('.')}).strict();
 export function buildDesktopApp(config:DesktopConfig,root:string,cloud='https://jarvis-eta-blue.vercel.app') {
@@ -18,9 +19,14 @@ export function buildDesktopApp(config:DesktopConfig,root:string,cloud='https://
   const projects = new ReadOnlyProjects(config);
   const voice = new LocalVoice(root);
   const tickets = new TicketRunner(config,root);
+  const erp = new ErpBrowser(root,config);
   let cloudSession:Promise<string>|undefined;
   registerAuth(app,{bridgeAuthorized:(request)=>{
     const url=request.url.split('?')[0];
+    if(/^\/api\/bridge\/tickets\/erp\/(?:status|list|connect|download|run)$/.test(url)) {
+      const allowed=request.method==='GET'?/\/(?:status|list)$/.test(url):request.method==='POST' && /\/(?:connect|download|run)$/.test(url);
+      return allowed && request.headers.origin===BRIDGE_ORIGIN && validBridgeToken((request.headers.authorization || '').replace(/^Bearer /,''),process.env.JARVIS_ACCESS_KEY!,Date.now(),'tickets');
+    }
     if(/^\/api\/bridge\/tickets(?:\/status|\/[a-f0-9-]{36}\/(?:cancel|open))?$/.test(url)) {
       const allowed=request.method==='GET'?/^\/api\/bridge\/tickets(?:\/status)?$/.test(url):request.method==='POST' && (url==='/api/bridge/tickets' || /\/(?:cancel|open)$/.test(url));
       return allowed && request.headers.origin===BRIDGE_ORIGIN && validBridgeToken((request.headers.authorization || '').replace(/^Bearer /,''),process.env.JARVIS_ACCESS_KEY!,Date.now(),'tickets');
@@ -34,13 +40,24 @@ export function buildDesktopApp(config:DesktopConfig,root:string,cloud='https://
     if (!/^(?:127\.0\.0\.1|localhost)(?::\d+)?$/.test(request.headers.host || '')) return reply.code(403).send({message:'Host no permitido.'});
   });
   app.addHook('onSend',async(_request,reply,payload) => {reply.header('Cache-Control','no-store'); return payload;});
-  app.setErrorHandler((error,_request,reply) => reply.code(400).send({message:error instanceof z.ZodError ? 'Revisá los datos enviados.' : 'No se pudo completar la lectura o la conexión.'}));
+  app.setErrorHandler((error,_request,reply) => reply.code(400).send({message:error instanceof ErpError?error.message:error instanceof z.ZodError ? 'Revisá los datos enviados.' : 'No se pudo completar la lectura o la conexión.'}));
   app.get('/api/desktop/status',async() => ({mode:'read-only',local:true,projects:projects.list(),voice:voice.status()}));
   app.get('/api/desktop/files',async(request) => { const args=query.parse(request.query); return projects.files(args.project,args.path); });
   app.get('/api/desktop/read',async(request) => { const args=query.parse(request.query); return projects.read(args.project,args.path); });
   app.get('/api/desktop/git',async(request) => { const args=query.parse(request.query); return projects.git(args.project); });
   app.get('/api/voice/status',async() => voice.status());
   for(const prefix of ['/api/tickets','/api/bridge/tickets']) {
+    app.get(prefix+'/erp/status',async()=>erp.status());
+    app.get(prefix+'/erp/list',async()=>erp.list());
+    app.post(prefix+'/erp/connect',async()=>erp.connect());
+    app.post(prefix+'/erp/download',async(request)=>erp.download(z.object({selector:z.string().trim().min(1).max(150)}).strict().parse(request.body).selector));
+    app.post(prefix+'/erp/run',async(request,reply)=>{
+      const {selector,instruction}=z.object({selector:z.string().trim().min(1).max(150),instruction:z.string().trim().min(10).max(32000)}).strict().parse(request.body);
+      if((await tickets.status()).active)return reply.code(409).send({message:'Ya hay un ticket en ejecución.'});
+      const downloaded=await erp.download(selector);
+      if(downloaded.skipped.length)return reply.code(400).send({message:'El ticket tiene adjuntos que requieren revisión: '+downloaded.skipped.join(', ')});
+      return reply.code(202).send(await tickets.start({project:'ohlimpiaerp',instruction,ticketPath:downloaded.ticketPath,referencePaths:downloaded.referencePaths}));
+    });
     app.get(prefix+'/status',async()=>tickets.status());
     app.get(prefix,async()=>tickets.list());
     app.post(prefix,async(request,reply)=>{
@@ -99,6 +116,6 @@ export function buildDesktopApp(config:DesktopConfig,root:string,cloud='https://
   app.register(fastifyStatic,{root:path.join(root,'frontend','dist'),prefix:'/'});
   app.setNotFoundHandler((request,reply) => request.url.startsWith('/api/') ? reply.code(404).send({message:'Operación no disponible.'}) : reply.sendFile('index.html'));
   app.addHook('onReady',async()=>voice.start());
-  app.addHook('onClose',async()=>{tickets.close();voice.close();});
+  app.addHook('onClose',async()=>{tickets.close();voice.close();await erp.close();});
   return app;
 }

@@ -37,14 +37,18 @@ function App() {
   } = useChat();
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const commandBusyRef = useRef(false);
+  const localNoticeVoiceRef=useRef<(text:string)=>void>(()=>{});
   const routeTicket = (text:string) => {
-    if(!/^(?:(?:por favor|jarvis)[, :]+)?(?:resolv[eé]|resolver|resuelve|implement[aá]|hac[eé])(?:\s|[:,]).{0,100}\bticket\b/i.test(text))return false;
+    const direct=/^(?:(?:por favor|jarvis)[, :]+)?(?:resolv[eé]|resolver|resuelve|implement[aá]|hac[eé])(?:\s|[:,]).{0,100}\bticket\b/i.test(text);
+    const enterErp=/\b(?:entr[aá]|abr[ií]|anda|and[aá])(?:\s|[,]).{0,60}ohlimpia.{0,100}\bticket\b/i.test(text);
+    const listErp=/ohlimpia|erp/i.test(text) && /\btickets\b/i.test(text) && /qu[eé]|ver|mostr|list|busc/i.test(text);
+    if(!direct && !enterErp && !listErp)return false;
     if(!desktopConnected()){addSystemMessage('Conectá esta PC para ejecutar tickets con Claude Code.');return true;}
     window.dispatchEvent(new CustomEvent('jarvis-run-ticket',{detail:text}));
     return true;
   };
   useEffect(()=>{
-    const notice=(event:Event)=>addSystemMessage((event as CustomEvent<string>).detail);
+    const notice=(event:Event)=>{const text=(event as CustomEvent<string>).detail;addSystemMessage(text);localNoticeVoiceRef.current(text);};
     window.addEventListener('jarvis-ticket-notice',notice);
     return()=>window.removeEventListener('jarvis-ticket-notice',notice);
   },[addSystemMessage]);
@@ -72,6 +76,7 @@ function App() {
       } else void commandRef.current(command);
     },
   });
+  localNoticeVoiceRef.current=(text)=>speech.speak(text);
 
   const pendingSpeechRef = useRef('');
   const speakingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);

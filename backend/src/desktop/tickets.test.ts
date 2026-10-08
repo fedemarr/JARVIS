@@ -70,3 +70,13 @@ test('ticket: una sola tarea, cancelación y proyectos no autorizados',async()=>
     await runner.cancel(job.id);assert.equal((await terminal(runner,job.id)).status,'cancelled');
   }finally{runner.close();await data.clean();}
 });
+test('ticket: adjunto grande ignorado por Git se copia y se consulta sin inflar el prompt',async()=>{
+  const data=await fixture();const reference='jarvis-tickets/mockup.html';
+  await fs.writeFile(path.join(data.project,'.gitignore'),'jarvis-tickets/\n');await fs.mkdir(path.join(data.project,'jarvis-tickets'));await fs.writeFile(path.join(data.project,reference),'<h1>Mockup</h1>'+'x'.repeat(80000));
+  const runner=new TicketRunner(data.config,data.root,async(workspace,prompt)=>{
+    assert(prompt.includes(reference));assert(prompt.length<10000);assert((await readTicketFile(workspace,reference)).length>64000);
+    await writeTicketFile(workspace,'sum.js','export const sum=(a,b)=>a+b;');return 'Adjunto consultado.';
+  });
+  try{const job=await runner.start({project:'ohlimpiaerp',instruction:'Resolver el ticket con el mockup.',referencePaths:[reference]});assert.equal((await terminal(runner,job.id)).status,'ready');}
+  finally{runner.close();await data.clean();}
+});

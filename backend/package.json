@@ -11,7 +11,7 @@
     "llm:test": "tsx src/llm/test.ts",
     "n8n:test": "tsx src/n8n/test.ts",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "test": "tsx --test src/cloud/backend.test.ts src/desktop/desktop.test.ts src/desktop/tickets.test.ts src/internet/internet.test.ts"
+    "test": "tsx --test src/cloud/backend.test.ts src/desktop/desktop.test.ts src/desktop/tickets.test.ts src/desktop/erp.test.ts src/internet/internet.test.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.39.0",

@@ -60,6 +60,8 @@ test('API local: sesión obligatoria, origen/host, sin comandos ni escritura', a
     assert.equal((await app.inject({method:'POST',url:'/api/bridge/tickets',headers:bridge,payload:{project:'ohlimpiaerp',instruction:'Resolver este ticket.'}})).statusCode,401,'La credencial de lectura no puede iniciar tareas');
     const ticketAuth={...headers,origin:BRIDGE_ORIGIN,authorization:'Bearer '+createBridgeToken(process.env.JARVIS_ACCESS_KEY!,Date.now(),'tickets')};
     assert.equal((await app.inject({url:'/api/bridge/tickets/status',headers:ticketAuth})).statusCode,200);
+    assert.equal((await app.inject({url:'/api/bridge/tickets/erp/status',headers:ticketAuth})).statusCode,200);
+    assert.equal((await app.inject({method:'POST',url:'/api/bridge/tickets/erp/run',headers:bridge,payload:{selector:'siguiente',instruction:'Resolver el siguiente ticket.'}})).statusCode,401,'Lectura/voz no habilita trabajos de ERP');
     assert.equal((await app.inject({url:'/api/bridge/desktop/status',headers:ticketAuth})).statusCode,401,'La credencial de tareas no habilita otras rutas');
     assert.equal((await app.inject({method:'OPTIONS',url:'/api/bridge/desktop/status',headers:{...headers,origin:BRIDGE_ORIGIN,'access-control-request-method':'GET','access-control-request-headers':'authorization'}})).statusCode,204);
   } finally {await app.close();for(const [key,value] of Object.entries({JARVIS_ACCESS_KEY:original.key,ALLOWED_ORIGINS:original.origins,JARVIS_MODE:original.mode})) {if(value===undefined)delete process.env[key];else process.env[key]=value;}}

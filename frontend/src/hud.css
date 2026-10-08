@@ -108,3 +108,5 @@ body { background: #020817; color: #d6e6ff; }
 .ticket-job { margin-top: 12px; padding: 10px; border: 1px solid #23536c; border-radius: 8px; }
 .ticket-job pre { white-space: pre-wrap; overflow-wrap: anywhere; max-height: 300px; overflow: auto; font-size: 11px; }
 .ticket-job details { margin-top: 10px; }
+.erp-inbox { padding: 10px; margin: 12px 0; border: 1px solid #23536c; border-radius: 8px; }
+.erp-inbox select { width: 100%; max-width: 100%; margin: 10px 0; background: #061322; color: #d8f3ff; padding: 8px; }

@@ -1,0 +1,11 @@
+const assert=require('node:assert/strict');const fs=require('node:fs');const ts=require('typescript');const vm=require('node:vm');const context={exports:{}};
+vm.runInNewContext(ts.transpileModule(fs.readFileSync('frontend/src/lib/spokenText.ts','utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText,context);
+const {prepareSpokenText:clean,splitSpokenText:split,findSpokenBoundary:boundary}=context.exports;
+assert.equal(clean('## Resumen\n1. **Revisar** el ticket.\n- Probar el cambio.\n• Abrir [la documentación](https://ejemplo.com/guia).'),'Resumen. Revisar el ticket. Probar el cambio. Abrir la documentación.');
+assert.equal(clean('El valor es 3.14 y la fecha es 8/10/2026.'),'El valor es 3.14 y la fecha es 8/10/2026.');
+assert(!clean('Ver https://ejemplo.com').includes('https'));
+assert.equal(clean('```js\nconst x = 1;\n```'),'El bloque de código está disponible en el chat.');
+const text='Esta oración completa permite una pausa natural antes del próximo fragmento. '.repeat(7);const chunks=split(text);assert(chunks.every(t=>t.length<=220));assert.equal(chunks.join(''),text);assert(chunks[0].trim().endsWith('.'));
+assert.equal(boundary('Texto de referencia bastante largo para explicar [la fuente](https://ejemplo.com'),0,'No cortar un enlace Markdown antes de completarlo');
+assert.equal(boundary('```js\n'+ 'const variable = 1;\n'.repeat(20)),0,'No leer código parcial durante streaming');
+console.log('PASS: voz sin viñetas, números de lista, Markdown ni URLs; cifras conservadas, pausas naturales y streaming sin partir enlaces o código.');

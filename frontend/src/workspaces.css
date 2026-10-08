@@ -29,6 +29,13 @@ html, body, #root { overflow: hidden; }
 .chat-panel .conversation-feed { overscroll-behavior: contain; }
 .chat-panel .composer-wrap { padding: 14px 18px; }
 .feed-heading { letter-spacing: .8px; }
+.global-voice-controls { flex-shrink: 0; padding: 10px 28px; background: #071a30; border-bottom: 1px solid #26496a; display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center; }
+.global-voice-controls .handsfree-controls { padding: 0; flex: 1; }
+.global-voice-controls .handsfree-toggle { padding: 10px 14px; font-size: 12px; font-family: 'Segoe UI', sans-serif; font-weight: 600; }
+.global-voice-controls .voice-notice { flex-basis: 100%; margin: 0; }
+.voice-engine { color: #a9d9ee; font-size: 11px; }
+.header-actions { display: flex; align-items: center; gap: 12px; }
+.refresh-app { padding: 7px 10px; background: #0b2240; border: 1px solid #285372; border-radius: 5px; color: #93cfea; font-size: 10px; }
 .stop-reply-button { padding: 7px 10px; border: 1px solid #ab7952; border-radius: 5px; color: #ffcea7; background: #34241e; font-size: 11px; }
 .local-view { flex: 1; min-height: 0; overflow: auto; padding: 24px 28px; overscroll-behavior: contain; }
 .local-view .desktop-panel { margin: 0; padding: 0; background: transparent; border: 0; }
@@ -71,6 +78,7 @@ html, body, #root { overflow: hidden; }
 @media (min-width: 1500px) { .mission-workspace .reactor-diagram { width: min(400px, 100%); } }
 @media (max-width: 1100px) { .command-shell { grid-template-columns: 175px minmax(0, 1fr); }.workspace-navigation { padding-left: 20px; padding-right: 20px; }.workspace-navigation button { padding: 12px 10px; gap: 8px; }.workspace-navigation small { font-size: 9px; }.mission-workspace { grid-template-columns: minmax(0, 1fr) minmax(320px, 48%); }.ticket-agent { grid-template-columns: 1fr; }.ticket-overview, .ticket-executions { grid-column: auto; }.computer-content .desktop-files { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (max-width: 760px) {
+  .global-voice-controls { padding: 9px 12px; }.global-voice-controls .voice-engine { display: none; }.global-voice-controls .handsfree-controls { gap: 8px; }.global-voice-controls .handsfree-controls > span { flex-basis: 100%; }.header-actions { gap: 5px; }.refresh-app { font-size: 9px; padding: 6px; }
   .command-shell { display: flex; flex-direction: column; }.command-sidebar { padding: 10px 16px; }.command-sidebar .nav-item { display: none; }.command-sidebar .brand { margin: 0; }.command-header { padding: 14px 16px; }.command-header h1 { font-size: 18px; }.workspace-navigation { padding: 8px 12px 12px; gap: 6px; }.workspace-navigation button { font-size: 11px; padding: 10px 6px; justify-content: center; gap: 5px; }.workspace-navigation button small { display: none; }.area-icon { font-size: 17px; width: auto; }
   .mission-workspace { display: flex; flex-direction: column; overflow-y: auto; }.mission-workspace .main-scroll { flex: none; overflow: visible; }.mission-workspace .core-stage { padding: 15px; gap: 12px; }.mission-workspace .reactor-diagram { width: min(240px, calc(100vw - 70px)); }.mission-workspace .core-telemetry { display: none; }.mission-workspace .mission-shortcuts, .session-strip { display: none; }.chat-panel { flex: 1 0 350px; overflow: visible; }.chat-panel .conversation-feed { flex: 1; min-height: 140px; max-height: 45dvh; }.chat-panel .composer-wrap { position: sticky; bottom: 0; }
   .local-view { padding: 18px 14px; }.ticket-overview { align-items: flex-start; flex-direction: column; padding: 18px; }.ticket-overview h2 { font-size: 21px; }.ticket-metrics { gap: 40px; }.ticket-metrics strong { font-size: 24px; }.erp-inbox, .ticket-request, .computer-content { padding: 18px; }.computer-content .desktop-controls { align-items: stretch; flex-direction: column; }.computer-content .desktop-controls select { max-width: 100%; min-width: 0; }.computer-content .desktop-files { grid-template-columns: 1fr; }.execution-heading button { font-size: 11px; }

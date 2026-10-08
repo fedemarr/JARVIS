@@ -6,7 +6,7 @@ import { Orb } from './components/Orb';
 import { TicketImport } from './components/TicketImport';
 import { DesktopPanel } from './components/DesktopPanel';
 import { apiFetch } from './lib/api';
-import { desktopConnected } from './lib/desktop';
+import { desktopConnected, naturalVoiceAvailable } from './lib/desktop';
 import { parseTicketCommand } from './lib/ticketCommand';
 import { useAccess } from './components/AccessGate';
 import { MicButton } from './components/MicButton';
@@ -15,6 +15,7 @@ import { ConfirmDialog } from './components/ConfirmDialog';
 import { createBrowserVoice, createInterruptionListener } from './lib/browserVoice';
 import { isStopReplyCommand } from './lib/voiceCommands';
 import { useReplyInterrupt } from './hooks/useReplyInterrupt';
+import { findSpokenBoundary } from './lib/spokenText';
 import { LlmMessage } from '../../shared/llm';
 
 function App() {
@@ -126,21 +127,10 @@ function App() {
       if(replyInterruptedRef.current)return;
       pendingSpeechRef.current += delta;
       const acc = pendingSpeechRef.current;
-      // Cortar en oraciones: punto, signo, salto de línea o al superar 200 chars.
-      const matches = [...acc.matchAll(/[^.!?\n]*[.!?\n]+/g)];
-      let spokenUpTo = 0;
-      for (const m of matches) {
-        if (m.index! + m[0].length <= acc.length && acc.slice(0, m.index! + m[0].length).length >= 40) {
-          spokenUpTo = m.index! + m[0].length;
-        }
-      }
+      const spokenUpTo = findSpokenBoundary(acc);
       if (spokenUpTo > 0) {
         const chunk = acc.slice(0, spokenUpTo);
         pendingSpeechRef.current = acc.slice(spokenUpTo);
-        if (chunk.trim()) speech.speak(chunk);
-      } else if (acc.length > 240) {
-        const chunk = acc.slice(0, 200);
-        pendingSpeechRef.current = acc.slice(200);
         if (chunk.trim()) speech.speak(chunk);
       }
     },
@@ -297,13 +287,31 @@ function App() {
       <main className="command-main">
         <header className="command-header">
           <div><span className="eyebrow">JARVIS / ESPACIO PERSONAL</span><h1>{activeArea === 'communication' ? 'Comunicación' : activeArea === 'tickets' ? 'Centro de tickets' : 'Tu computadora'}</h1></div>
-          <div className={`connection-chip connection-${backendStatus}`}><span />{backendStatus === 'connected' ? 'EN LÍNEA' : backendStatus === 'checking' ? 'CONECTANDO' : 'SIN CONEXIÓN'}</div>
+          <div className="header-actions"><button type="button" className="refresh-app" onClick={()=>{const url=new URL(window.location.href);url.searchParams.set('refresh',String(Date.now()));window.location.replace(url.href);}}>Actualizar Jarvis</button><div className={`connection-chip connection-${backendStatus}`}><span />{backendStatus === 'connected' ? 'EN LÍNEA' : backendStatus === 'checking' ? 'CONECTANDO' : 'SIN CONEXIÓN'}</div></div>
         </header>
         <nav className="workspace-navigation" aria-label="Sectores de Jarvis">
           <button type="button" aria-label="Comunicación" aria-pressed={activeArea === 'communication'} onClick={() => setActiveArea('communication')}><span className="area-icon">◉</span><span>Comunicación<small>Conversación y voz</small></span></button>
           <button type="button" aria-label="Tickets" aria-pressed={activeArea === 'tickets'} onClick={() => setActiveArea('tickets')}><span className="area-icon">⌘</span><span>Tickets<small>OhlimpiaERP y Claude Code</small></span></button>
           <button type="button" aria-label="Computadora" aria-pressed={activeArea === 'computer'} onClick={() => setActiveArea('computer')}><span className="area-icon">▣</span><span>Computadora<small>Proyectos y archivos</small></span></button>
         </nav>
+        <div className="global-voice-controls">
+          <span className="voice-engine">{naturalVoiceAvailable()?'Voz natural · Alex':'Voz del navegador'}</span>
+          <div className="handsfree-controls">
+            {(isLoading || speech.orbState==='SPEAKING') && <button type="button" className="stop-reply-button" onClick={()=>stopReplyRef.current()}>Detener respuesta</button>}
+            <button type="button" className={handsFree ? 'handsfree-toggle handsfree-active' : 'handsfree-toggle'} aria-pressed={handsFree} disabled={!speech.sttSupported || !speech.ttsSupported} onClick={() => {
+              setVoiceNotice('');
+              setVoiceAwake(false);
+              if (handsFree) { setHandsFree(false); speech.abortListening(); }
+              else {
+                setHandsFree(true);
+                // Activar durante una respuesta debe esperar, no cancelar la voz.
+                if (!isLoading && !commandBusyRef.current && speech.orbState === 'IDLE') speech.startListening();
+              }
+            }}>{handsFree ? 'Desactivar manos libres' : 'Activar manos libres'}</button>
+            <span role="status">{handsFree ? isLoading || speech.orbState === 'SPEAKING' ? 'Decí «gracias, Jarvis» para detener la respuesta' : voiceAwake ? 'Conversación activa · te escucho al terminar de hablar' : 'Decí «Jarvis» para llamarme' : !speech.sttSupported ? 'Reconocimiento de voz no disponible en este navegador' : 'Activá el micrófono una vez y después decí «Jarvis»'}</span>
+          </div>
+          {voiceNotice && <p className="voice-notice" role="alert">{voiceNotice}</p>}
+        </div>
         <div className="mission-workspace" hidden={activeArea !== 'communication'}>
         <div className="main-scroll">
           <section className="core-stage" aria-label="Estado del asistente">
@@ -343,21 +351,6 @@ function App() {
             <button type="button" onClick={speech.toggleMute} aria-label={speech.isMuted ? 'Activar voz' : 'Silenciar voz'} title={speech.isMuted ? 'Activar voz' : 'Silenciar voz'} className="voice-toggle">{speech.isMuted ? <MutedIcon /> : <SpeakerIcon />}</button>
             <button type="submit" disabled={(isLoading && !isStopReplyCommand(input)) || !input.trim()} className="send-button" aria-label="Enviar mensaje">↗</button>
           </form>
-          <div className="handsfree-controls">
-            {(isLoading || speech.orbState==='SPEAKING') && <button type="button" className="stop-reply-button" onClick={()=>stopReplyRef.current()}>Detener respuesta</button>}
-            <button type="button" className={handsFree ? 'handsfree-toggle handsfree-active' : 'handsfree-toggle'} aria-pressed={handsFree} disabled={!speech.sttSupported || !speech.ttsSupported} onClick={() => {
-              setVoiceNotice('');
-              setVoiceAwake(false);
-              if (handsFree) { setHandsFree(false); speech.abortListening(); }
-              else {
-                setHandsFree(true);
-                // Activar durante una respuesta debe esperar, no cancelar la voz.
-                if (!isLoading && !commandBusyRef.current && speech.orbState === 'IDLE') speech.startListening();
-              }
-            }}>{handsFree ? 'Desactivar manos libres' : 'Activar manos libres'}</button>
-            <span role="status">{handsFree ? isLoading || speech.orbState === 'SPEAKING' ? 'Decí «gracias, Jarvis» para detener la respuesta' : voiceAwake ? 'Conversación activa · te escucho al terminar de hablar' : 'Decí «Jarvis» para llamarme' : !speech.sttSupported ? 'Reconocimiento de voz no disponible en este navegador' : 'Activá el micrófono una vez y después decí «Jarvis»'}</span>
-          </div>
-          {voiceNotice && <p className="voice-notice" role="alert">{voiceNotice}</p>}
           <div className="composer-footer"><span>ENTER para enviar · SHIFT + ENTER para nueva línea</span>
             {speech.ttsSupported && speech.voices.length > 0 && <select aria-label="Voz de Jarvis" value={speech.selectedVoice ?? ''} onChange={(e) => speech.changeVoice(e.target.value)}><option value="">Voz automática</option>{speech.voices.map((v) => <option key={v.voiceURI} value={v.voiceURI}>{v.name} ({v.lang})</option>)}</select>}
           </div>

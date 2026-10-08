@@ -1,5 +1,6 @@
 import { SttProvider, TtsProvider, SttEndReason, TtsVoice } from '../../../shared/voice';
 import { desktopFetch, desktopConnected, naturalVoiceAvailable } from './desktop';
+import { prepareSpokenText, splitSpokenText } from './spokenText';
 
 const RecognitionCtor: SpeechRecognitionConstructor | undefined =
   typeof webkitSpeechRecognition !== 'undefined'
@@ -130,14 +131,7 @@ class BrowserTts implements TtsProvider {
 
   speak(text: string): void {
     if (!this.supported || this.muted || !text.trim()) return;
-    let remaining = text;
-    while (remaining.length > 220) {
-      const space = remaining.lastIndexOf(' ', 220);
-      const end = space >= 80 ? space + 1 : 220;
-      this.queue.push(remaining.slice(0, end));
-      remaining = remaining.slice(end);
-    }
-    if (remaining) this.queue.push(remaining);
+    this.queue.push(...splitSpokenText(prepareSpokenText(text)));
     this.speakNext();
   }
 

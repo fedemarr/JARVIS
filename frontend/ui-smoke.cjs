@@ -118,7 +118,7 @@ async function run() {
     await page.locator('.reactor-idle').waitFor();
     await page.getByRole('button',{name:'Desactivar manos libres'}).click();
     assert.equal(await page.evaluate(()=>window.recognitionStarts),0,'No abrir el micrófono mientras está hablando');
-    assert.equal(await page.evaluate(() => window.spoken.slice(2).join('')), replyParts.join(''), 'Leer toda la respuesta en orden');
+    assert.equal(await page.evaluate(() => window.spoken.slice(2).map(text=>text.trim()).join(' ')), replyParts.join('').trim(), 'Leer toda la respuesta en orden');
     assert.match(submitted.message, /Corregir validación/);
     await page.getByRole('button', { name: /^Tickets/ }).click();
     await upload.setInputFiles({ name: 'grande.md', mimeType: 'text/markdown', buffer: Buffer.alloc(66000, 'x') });

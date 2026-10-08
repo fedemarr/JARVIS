@@ -50,6 +50,7 @@ const server=http.createServer((req,res)=>{
    await page.setViewportSize(size);
    for(const name of ['Comunicación','Tickets','Computadora']){
     await sector(name).click();assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth||document.documentElement.scrollHeight>innerHeight),false);
+    assert(await page.getByRole('button',{name:'Activar manos libres',exact:true}).isVisible(),'Manos libres visible en todos los sectores');
     if(name!=='Comunicación')assert.equal(await page.locator('.local-view').evaluate(el=>el.scrollTop),0,'Cada sector abre desde su encabezado');
     if(size.width===390)await page.screenshot({path:'artifacts/workspace-mobile-'+name.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase()+'.png'});
    }

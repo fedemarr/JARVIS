@@ -79,11 +79,7 @@ test('publicación: revisa destino, detecta cambios posteriores y exige aprobaci
     let pushed=false;const states:NonNullable<typeof job.publication>[]=[];
     const publishing=new TicketPublisher(data.project,path.join(data.root,'data','ticket-jobs',job.id),{
       push:async()=>{pushed=true;},
-      deploy:async directory=>{
-        assert(pushed);assert((await fs.readFile(path.join(directory,'sum.js'),'utf8')).includes('a+b'));
-        assert.equal(await fs.readFile(path.join(directory,'ticket.md'),'utf8'),'La suma da un resultado incorrecto.');
-        return 'https://test-deployment.vercel.app';
-      }
+      deployment:async commit=>{assert(pushed);assert.equal(commit,git(['rev-parse','HEAD']).trim());return {state:'READY',url:'test-deployment.vercel.app'};}
     });
     await publishing.publish(job,plan,async publication=>{states.push(publication);});
     assert.equal(states.at(-1)?.status,'published');assert.equal(states.at(-1)?.url,'https://test-deployment.vercel.app');
@@ -91,11 +87,29 @@ test('publicación: revisa destino, detecta cambios posteriores y exige aprobaci
     assert.equal(git(['diff','--cached','--name-only']).trim(),'ticket.md','conserva cambios ajenos staged');
     const committedJob={...job,publication:states.at(-1)};
     let failed:typeof job.publication;
-    const failing=new TicketPublisher(data.project,path.join(data.root,'data','ticket-jobs',job.id),{push:async()=>{throw new Error('No hay conexión');}});
+    let pushAttempts=0;
+    const failing=new TicketPublisher(data.project,path.join(data.root,'data','ticket-jobs',job.id),{push:async()=>{pushAttempts++;throw new Error('No hay conexión');},wait:async()=>{}});
     await failing.publish(committedJob,await failing.plan(committedJob),async publication=>{failed=publication;});
     assert.equal(failed?.status,'failed');assert.equal(failed?.commit,states.at(-1)?.commit);
+    assert.equal(pushAttempts,3,'reintenta errores de conexión sin duplicar commits');
     assert.equal(git(['rev-parse','HEAD']).trim(),failed?.commit,'no duplica el commit al reintentar');
   }finally{runner.close();await data.clean();}
+});
+
+test('publicación: espera el SHA exacto de Vercel y distingue build fallido de pendiente',async()=>{
+  let queries=0,waits=0;
+  const publisher=new TicketPublisher('unused','unused',{deployment:async commit=>{
+    assert.equal(commit,'expected-sha');queries++;
+    return queries===1?undefined:{state:queries===2?'BUILDING':'READY',url:'matched-sha.vercel.app'};
+  },wait:async()=>{waits++;}});
+  assert.equal(await publisher.waitForDeployment('expected-sha'),'https://matched-sha.vercel.app');assert.equal(waits,2);
+  const failed=new TicketPublisher('unused','unused',{deployment:async()=>({state:'ERROR',url:'failed-build.vercel.app'})});
+  await assert.rejects(failed.waitForDeployment('sha'),/build de Vercel falló/);
+  const absent=new TicketPublisher('unused','unused',{deployment:async()=>undefined,wait:async()=>{}});
+  await assert.rejects(absent.waitForDeployment('sha'),/todavía no confirmó/);
+  let networkQueries=0;
+  const reconnect=new TicketPublisher('unused','unused',{deployment:async()=>{if(++networkQueries===1)throw new Error('ECONNRESET');return {state:'READY',url:'reconnected.vercel.app'};},wait:async()=>{}});
+  assert.equal(await reconnect.waitForDeployment('sha'),'https://reconnected.vercel.app');assert.equal(networkQueries,2);
 });
 test('ticket: límites de archivos y credencial distinta del puente de lectura',async()=>{
   const data=await fixture();

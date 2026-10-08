@@ -8,12 +8,50 @@ import type { TicketJob } from './tickets';
 
 const exec=promisify(execFile);
 const gitOptions=['-c','core.fsmonitor=false','-c','core.hooksPath=NUL'];
-export type Publication={status:'publishing'|'published'|'failed';message:string;commit?:string;url?:string};
+export type Publication={status:'publishing'|'published'|'pending'|'failed';message:string;commit?:string;url?:string};
 export type PublishPlan={token:string;branch:string;remote:string;project:string;files:string[];diff:string};
-type PublishServices={push?:(branch:string)=>Promise<void>;deploy?:(directory:string)=>Promise<string>};
+type Deployment={state:string;url:string};
+type PublishServices={push?:(branch:string)=>Promise<void>;deployment?:(commit:string)=>Promise<Deployment|undefined>;wait?:()=>Promise<void>};
+class PublicationPendingError extends Error {}
+function transient(error:unknown){const e=error as {message?:string;stderr?:string;killed?:boolean};return e.killed || /timed? out|timeout|Could not resolve|Failed to connect|Connection.*(?:reset|closed)|network|No hay conexión|ECONN|ENOTFOUND|EAI_AGAIN/i.test((e.stderr||'')+' '+(e.message||''));}
 export class TicketPublisher {
+  private scope?:Promise<string>;
   constructor(private workspace:string,private directory:string,private services:PublishServices={}){}
   private async git(args:string[]){return (await exec('git',[...gitOptions,...args],{cwd:this.workspace,windowsHide:true,timeout:60000,maxBuffer:4*1024*1024,env:{...process.env,GIT_TERMINAL_PROMPT:'0'}})).stdout;}
+  async checkDeployment(commit:string):Promise<Deployment|undefined>{
+    const project=JSON.parse(await fs.readFile(path.join(this.workspace,'.vercel','project.json'),'utf8'));
+    const cli=path.join(process.env.APPDATA||'','npm','node_modules','vercel','dist','vc.js');
+    this.scope??=(async()=>{
+      const {stdout}=await exec(process.execPath,[cli,'teams','ls','--json'],{windowsHide:true,timeout:30000,maxBuffer:1024*1024});
+      const team=JSON.parse(stdout).teams?.find((team:{id:string})=>team.id===project.orgId);
+      if(!team?.slug)throw new Error('La vinculación local de Vercel apunta a un equipo sin acceso. Actualizá .vercel/project.json para el proyecto OhlimpiaERP.');
+      return team.slug as string;
+    })().catch(error=>{this.scope=undefined;throw error;});
+    const {stdout}=await exec(process.execPath,[cli,'ls',project.projectName,'--scope',await this.scope,'--json'],{windowsHide:true,timeout:30000,maxBuffer:2*1024*1024});
+    const rows=JSON.parse(stdout).deployments;
+    if(!Array.isArray(rows))throw new Error('Vercel no devolvió el estado de los despliegues.');
+    const match=rows.find((row:{target?:string;meta?:{githubCommitSha?:string}})=>row.target==='production' && row.meta?.githubCommitSha===commit);
+    if(!match)return undefined;
+    const url='https://'+match.url;
+    if(!/^https:\/\/[a-z0-9-]+\.vercel\.app$/.test(url))throw new Error('Vercel devolvió un enlace de despliegue inválido.');
+    return {state:match.state,url};
+  }
+  private async pause(){await (this.services.wait?.()??new Promise(resolve=>setTimeout(resolve,10000)));}
+  async waitForDeployment(commit:string):Promise<string>{
+    for(let attempt=0;attempt<30;attempt++){
+      let deployment:Deployment|undefined;
+      try{deployment=await (this.services.deployment?.(commit)??this.checkDeployment(commit));}
+      catch(error){if(!transient(error))throw error;if(attempt===29)throw new PublicationPendingError('Vercel no respondió a la consulta. El commit se conserva; Jarvis seguirá consultando el estado.');}
+      if(deployment){
+        const url=deployment.url.startsWith('https://')?deployment.url:'https://'+deployment.url;
+        if(!/^https:\/\/[a-z0-9-]+\.vercel\.app$/.test(url))throw new Error('Vercel devolvió un enlace de despliegue inválido.');
+        if(deployment.state==='READY')return url;
+        if(['ERROR','CANCELED','CANCELLED'].includes(deployment.state))throw new Error('El build de Vercel falló para este commit. Revisá los logs en '+url+'. El commit permanece subido.');
+      }
+      if(attempt<29)await this.pause();
+    }
+    throw new PublicationPendingError('El commit está subido, pero Vercel todavía no confirmó el deploy. Jarvis seguirá consultando el estado; no se creará otro commit.');
+  }
   async plan(job:TicketJob):Promise<PublishPlan> {
     if(job.mode!=='project' || job.status!=='ready' || !job.baseline || !job.files?.length)throw new Error('El ticket debe estar preparado y tener cambios para publicar.');
     if(!job.checks?.some(c=>c.status==='passed') || job.checks.some(c=>c.status==='failed'))throw new Error('Primero deben aprobarse las comprobaciones del ticket.');
@@ -44,22 +82,22 @@ export class TicketPublisher {
         publication.commit=(await this.git(['rev-parse','HEAD'])).trim();await save({...publication});
       }
       publication.message='Subiendo el commit a GitHub.';await save({...publication});
-      if(this.services.push)await this.services.push(plan.branch);
-      else await this.git(['-c','credential.helper=','-c','credential.helper=!gh auth git-credential','push','origin',`HEAD:refs/heads/${plan.branch}`]);
-      publication.message='Publicando el commit en Vercel.';await save({...publication});
-      // Export the committed tree only: unrelated edits in the user's project never enter the upload.
-      const output=path.join(this.directory,'deploy-'+publication.commit),archive=path.join(this.directory,'deploy-'+publication.commit+'.tar');
-      await fs.mkdir(output,{recursive:true});
-      await this.git(['archive','--format=tar','--output='+archive,publication.commit!]);
-      await exec('tar',['-xf',archive,'-C',output],{windowsHide:true,timeout:30000});
-      await fs.mkdir(path.join(output,'.vercel'),{recursive:true});
-      await fs.copyFile(path.join(this.workspace,'.vercel','project.json'),path.join(output,'.vercel','project.json'));
-      const cli=path.join(process.env.APPDATA||'','npm','node_modules','vercel','dist','vc.js');
-      const result=this.services.deploy?{stdout:await this.services.deploy(output),stderr:''}:await exec(process.execPath,[cli,'--prod','--yes'],{cwd:output,windowsHide:true,timeout:600000,maxBuffer:1024*1024});
-      const urls=(result.stdout+'\n'+result.stderr).match(/https:\/\/[a-z0-9.-]+\.vercel\.app/g);
-      if(!urls?.length)throw new Error('Vercel no devolvió el enlace de la publicación. Revisá el panel de despliegues.');
-      publication.status='published';publication.url=urls[urls.length-1];publication.message='Commit subido y despliegue completado. Probá el resultado en la web.';
-    }catch(error){publication.status='failed';publication.message=redact(error instanceof Error?error.message:'No pude publicar.').slice(0,2000);}
+      for(let attempt=0;attempt<3;attempt++){
+        try{
+          if(this.services.push)await this.services.push(plan.branch);
+          else await this.git(['-c','credential.helper=','-c','credential.helper=!gh auth git-credential','push','origin',`${publication.commit}:refs/heads/${plan.branch}`]);
+          break;
+        }catch(error){if(!transient(error)||attempt===2)throw error;publication.message='Reintentando la conexión con GitHub; se conserva el mismo commit.';await save({...publication});await this.pause();}
+      }
+      publication.message='Commit subido. Esperando el deploy de Vercel desde GitHub.';await save({...publication});
+      // GitHub triggers the production build. Confirm that exact SHA instead of uploading a second deployment.
+      publication.url=await this.waitForDeployment(publication.commit!);
+      publication.status='published';publication.message='Commit subido y despliegue completado. Probá el resultado en la web.';
+    }catch(error){
+      const command=error as {stderr?:string;stdout?:string;message?:string;killed?:boolean};
+      const detail=command.stderr?.trim() || command.stdout?.trim() || command.message || 'No pude publicar.';
+      publication.status=error instanceof PublicationPendingError?'pending':'failed';publication.message=redact((publication.commit?'El commit '+publication.commit.slice(0,12)+' se conserva. ':'')+(command.killed?'La consulta agotó el tiempo de espera. Reintentá; se conserva el mismo commit.':detail)).slice(-2000);
+    }
     await save({...publication});
   }
 }

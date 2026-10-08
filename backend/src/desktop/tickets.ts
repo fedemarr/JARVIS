@@ -23,6 +23,7 @@ export class TicketRunner {
   private active?:{id:string;abort:AbortController};
   private starting=false;
   private publishing=false;
+  private publicationChecks=new Map<string,{at:number;busy:boolean}>();
   private projects:ReadOnlyProjects;
   constructor(private config:DesktopConfig,private root:string,private driver?:Driver) {this.projects=new ReadOnlyProjects(config);}
   private home() {return path.join(this.root,'data','ticket-jobs');}
@@ -39,12 +40,28 @@ export class TicketRunner {
       try {
         const job=JSON.parse(await fs.readFile(path.join(this.home(),id,'job.json'),'utf8')) as TicketJob;
         if(job.id!==id)continue;
-        if(job.publication?.status==='publishing'){job.publication.status='failed';job.publication.message='El agente se reinició durante la publicación. El commit guardado se conserva; revisá Vercel antes de reintentar.';await this.save(job);}
+        if(job.publication?.status==='publishing'){job.publication.status='pending';job.publication.message='Retomando la consulta del deploy después del reinicio. Se conserva el commit.';await this.save(job);}
         if(['preparing','coding','checking'].includes(job.status)) {job.status='failed';job.message='El agente se reinició. Los cambios preparados se conservan.';await this.save(job);}
         else this.jobs.set(id,job);
       } catch { /* Unfinished metadata is not a runnable task. */ }
     }
+    if(!this.publishing)for(const job of this.jobs.values()){
+      const check=this.publicationChecks.get(job.id);
+      if(job.publication?.commit && ['pending','failed'].includes(job.publication.status) && !check?.busy && (!check || Date.now()-check.at>30000)){
+        this.publicationChecks.set(job.id,{at:Date.now(),busy:true});
+        void this.reconcilePublication(job).finally(()=>{this.publicationChecks.set(job.id,{at:Date.now(),busy:false});});
+      }
+    }
     return structuredClone([...this.jobs.values()].sort((a,b)=>b.createdAt.localeCompare(a.createdAt)).slice(0,20));
+  }
+  private async reconcilePublication(job:TicketJob){
+    try{
+      const result=await new TicketPublisher(this.workspace(job.id),path.join(this.home(),job.id)).checkDeployment(job.publication!.commit!);
+      const current=this.jobs.get(job.id);
+      if(result?.state==='READY' && current?.publication && current.publication.commit===job.publication!.commit && ['pending','failed'].includes(current.publication.status)){
+        current.publication={...current.publication,status:'published',url:result.url,message:'Commit subido y despliegue completado. Probá el resultado en la web.'};await this.save(current);
+      }
+    }catch{/* An unavailable status endpoint is not proof of a failed deployment. Retry on the next polling window. */}
   }
   async status() {
     const executable=this.claudeExecutable();
@@ -141,7 +158,7 @@ export class TicketRunner {
       const plan=await publisher.plan(job);
       if(plan.token!==approval.token)throw new Error('El proyecto cambió desde la revisión. Volvé a revisar la publicación.');
       job.publication={status:'publishing',message:'Preparando commit y deploy.',commit:job.publication?.commit};await this.save(job);
-      void publisher.publish(job,plan,async publication=>{job.publication=publication;await this.save(job);}).finally(()=>{this.publishing=false;});
+      void publisher.publish(job,plan,async publication=>{job.publication=publication;await this.save(job);}).catch(()=>{}).finally(()=>{this.publishing=false;});
       return {...job};
     }catch(error){this.publishing=false;throw error;}
   }

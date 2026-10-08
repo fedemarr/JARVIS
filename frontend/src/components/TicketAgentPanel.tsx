@@ -3,7 +3,7 @@ import { ticketFetch, readErpTickets } from '../lib/desktop';
 import { parseTicketCommand, setTicketContext } from '../lib/ticketCommand';
 import { ticketReport } from '../lib/ticketReport';
 
-type Job={id:string;status:string;message:string;editorOpened?:boolean;editorError?:string;summary?:string;diff?:string;files?:string[];checks?:{name:string;status:string;output:string}[];publication?:{status:string;message:string;commit?:string;url?:string}};
+type Job={id:string;ticket?:{title:string;number?:string;module?:string};status:string;message:string;editorOpened?:boolean;editorError?:string;summary?:string;diff?:string;files?:string[];checks?:{name:string;status:string;output:string}[];publication?:{status:string;message:string;commit?:string;url?:string}};
 type PublishPlan={token:string;branch:string;remote:string;project:string;files:string[];diff:string};
 type ErpTicket={id:string;number:string;title:string;priority:string;state:string};
 const running=(job:Job)=>['preparing','coding','checking'].includes(job.status);
@@ -129,7 +129,7 @@ export function TicketAgentPanel({ticketPath}:{ticketPath:string}) {
     <div className="ticket-executions"><div className="execution-heading"><div><span className="eyebrow">SEGUIMIENTO</span><h3>{activeJobs.length?'Trabajo en curso':'Último trabajo'}</h3></div><button type="button" aria-expanded={showHistory} onClick={()=>setShowHistory(value=>!value)}>{showHistory?'Ocultar historial':`Ver historial · ${jobs.length}`}</button></div>
     {jobs.length===0 && <div className="jobs-empty">Todavía no hay ejecuciones. Elegí un ticket para empezar.</div>}
     {visibleJobs.map(job=><article key={job.id} className={`ticket-job ticket-job-${job.status}`}>
-      <strong>{labels[job.status] || job.status}</strong><p>{job.message}</p>
+      {job.ticket && <h4>{job.ticket.number?job.ticket.number+' · ':''}{job.ticket.title}</h4>}<strong>{labels[job.status] || job.status}</strong><p>{job.message}</p>
       {job.editorOpened && <p>Proyecto abierto en VS Code · Claude Code está conectado al ejecutor local.</p>}
       {job.editorError && <p role="status">{job.editorError}</p>}
       {running(job)?<button type="button" onClick={()=>void action(job.id,'cancel')}>Detener tarea</button>:<button type="button" disabled={opening===job.id} onClick={()=>void action(job.id,'open')}>{opening===job.id?'Abriendo VS Code…':'Abrir cambios en VS Code'}</button>}

@@ -8,6 +8,7 @@ import { TicketRunner } from './tickets';
 import { readTicketFile,writeTicketFile,listTicketFiles } from './ticketFiles';
 import { createBridgeToken,validBridgeToken } from '../security/bridge';
 import { TicketPublisher } from './ticketPublish';
+import { ticketIdentity } from './ticketIdentity';
 
 async function fixture() {
   const root=await fs.mkdtemp(path.join(os.tmpdir(),'jarvis-tickets-'));
@@ -45,7 +46,20 @@ test('ticket: cambios directos en el proyecto, conserva ediciones previas e índ
     assert.equal(execFileSync('git',['diff','--cached','--name-only'],{cwd:project,encoding:'utf8'}).trim(),'');
     assert(!finished.diff?.includes('+// user edit'));
     const reloaded=new TicketRunner(config,root);assert.equal((await reloaded.list())[0].status,'ready');
+    const metadata=path.join(root,'data','ticket-jobs',job.id,'job.json');
+    const legacy=JSON.parse(await fs.readFile(metadata,'utf8'));delete legacy.ticket;await fs.writeFile(metadata,JSON.stringify(legacy));
+    await fs.writeFile(path.join(project,'ticket.md'),'# Error de suma\n\nNúmero visible: #77\nMódulo: Cálculos\n');
+    const migrated=(await new TicketRunner(config,root).list())[0];
+    assert.equal(migrated.ticket?.title,'Error de suma');assert.equal(migrated.ticket?.number,'#77');
+    assert.equal(JSON.parse(await fs.readFile(metadata,'utf8')).ticket.title,'Error de suma');
   } finally{runner.close();await fixtureData.clean();}
+});
+
+test('informe: identifica tickets Markdown y HTML sin inventar el nombre',()=>{
+  assert.deepEqual(ticketIdentity('# Correccion de bug\nNúmero visible: #134\nMódulo: Enfermos'),{title:'Correccion de bug',number:'#134',module:'Enfermos'});
+  assert.equal(ticketIdentity('<h1>Dotación <em>pendiente</em></h1>')?.title,'Dotación pendiente');
+  assert.equal(ticketIdentity('sin encabezado','tickets/suma.md')?.title,'suma');
+  assert.equal(ticketIdentity(''),undefined);
 });
 test('ticket: fallo en las pruebas no se presenta como tarea resuelta',async()=>{
   const data=await fixture();const runner=new TicketRunner(data.config,data.root,async()=> 'Sin cambios.');

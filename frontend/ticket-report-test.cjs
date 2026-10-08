@@ -1,0 +1,15 @@
+const assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('node:vm'),ts=require('typescript');
+const context={exports:{}};
+vm.runInNewContext(ts.transpileModule(fs.readFileSync('frontend/src/lib/ticketReport.ts','utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS}}).outputText,context);
+const report=context.exports.ticketReport;
+const base={status:'ready',message:'Preparado',ticket:{title:'Correccion de bug',number:'#134',module:'Enfermos y accidentes'},checks:[{name:'Pruebas unitarias',status:'passed',output:' Tests  323 passed (323)'}]};
+const text=report({...base,summary:'No pude correr pruebas.\n\n## Cambios\nSe corrigió el guardado.\n\n## Qué probar en el navegador\n1. Abrir caso → F5 → el caso sigue visible.\n\n## Límites\nNo requiere migración.'});
+assert(text.includes('**Ticket:** #134 — Correccion de bug'));
+assert(text.includes('## Resumen\nSe corrigió el guardado.'));
+assert(text.includes('## Qué probar\n1. Abrir caso → F5 → el caso sigue visible.'));
+assert(text.includes('323 passed'));assert(!text.includes('No pude correr pruebas.'));
+const revised=report({...base,summary:'## Resumen\nPrimera versión.\n## Qué probar\n1. Paso inicial.\n## Resumen\nVersión corregida.\n## Qué probar\n1. Paso corregido.'});
+assert(revised.includes('Versión corregida.'));assert(!revised.includes('Primera versión.'));assert(revised.includes('Paso corregido.'));
+assert(report({...base,summary:'Sin detalles.'}).includes('todavía no dejó pasos específicos'));
+assert(report({...base,publication:{status:'published',message:'Publicado',commit:'abc',url:'https://test.vercel.app'}}).includes('Web para probar: https://test.vercel.app'));
+console.log('PASS: nombre y número, resumen, pasos con resultado esperado, versión corregida, pruebas reales y publicación.');

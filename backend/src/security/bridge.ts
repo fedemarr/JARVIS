@@ -7,7 +7,9 @@ export function createBridgeToken(key:string,now=Date.now(),scope:'read-voice'|'
 export function validBridgeToken(token:string,key:string,now=Date.now(),scope:'read-voice'|'tickets'='read-voice'):boolean {
   const [expiry,nonce,signature,...extra]=token.split('.');
   const current=Math.floor(now/1000);
-  if(extra.length || !/^\d+$/.test(expiry || '') || !/^[a-f0-9]{32}$/.test(nonce || '') || !/^[a-f0-9]{64}$/.test(signature || '') || Number(expiry)<=current || Number(expiry)>current+600) return false;
+  // The issuer and PC have different clocks. Allow 30 seconds of positive skew;
+  // expired credentials still fail and the issuer continues to mint ten-minute tokens.
+  if(extra.length || !/^\d+$/.test(expiry || '') || !/^[a-f0-9]{32}$/.test(nonce || '') || !/^[a-f0-9]{64}$/.test(signature || '') || Number(expiry)<=current || Number(expiry)>current+630) return false;
   const expected=createHmac('sha256',key).update('desktop-'+scope+':'+BRIDGE_ORIGIN+':'+expiry+'.'+nonce).digest();
   return timingSafeEqual(expected,Buffer.from(signature,'hex'));
 }

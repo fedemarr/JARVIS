@@ -68,6 +68,8 @@ test('API local: sesión obligatoria, origen/host, sin comandos ni escritura', a
 test('credencial de puente: firma, propósito y vencimiento separados de la sesión',()=>{
   const key='test-only-key-'.repeat(4),now=Date.now();const token=createBridgeToken(key,now);
   assert(validBridgeToken(token,key,now));
+  assert(validBridgeToken(createBridgeToken(key,now+5000),key,now),'Tolera un pequeño desfase entre Vercel y la PC');
+  assert(!validBridgeToken(createBridgeToken(key,now+60000),key,now),'No acepta vencimientos arbitrariamente lejanos');
   assert(!validBridgeToken(token,key,now+600000));
   assert(!validBridgeToken(token,'different-key',now));
   assert(!validBridgeToken(token.slice(0,-1)+'X',key,now));

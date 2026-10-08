@@ -18,7 +18,7 @@ const server=http.createServer((req,res)=>{
   const context=await browser.newContext({viewport:{width:1440,height:1000},reducedMotion:'reduce'});const origin='http://127.0.0.1:'+server.address().port;await context.grantPermissions(['local-network-access'],{origin});const page=await context.newPage();const errors=[];page.on('pageerror',e=>errors.push(e.message));
   await page.addInitScript(()=>{window.webkitSpeechRecognition=class{start(){}stop(){this.onend?.()}abort(){this.onend?.()}};Object.defineProperty(window,'speechSynthesis',{value:{getVoices:()=>[],addEventListener(){},removeEventListener(){},cancel(){},speak(u){queueMicrotask(()=>u.onend?.())}}});});
   const erp=[{id:'465709685',number:'#131',title:'Dotacion',state:'Abierto',priority:'media'},{id:'468058393',number:'#132',title:'Supervisores',state:'Abierto',priority:'media'}];
-  let jobs=[{id:'11111111-1111-4111-8111-111111111111',status:'ready',message:'Cambios preparados en tu proyecto original.',files:['src/dotacion.js'],diff:'Cambios de prueba',summary:'Implementación preparada para revisar.',checks:[{name:'Pruebas del proyecto',status:'passed',output:'316 pruebas aprobadas.'}]},...Array.from({length:5},(_,i)=>({id:'old-'+i,status:'failed',message:'Ejecución anterior sin cambios.'}))];let submitted;let chats=0;
+  let jobs=[{id:'11111111-1111-4111-8111-111111111111',status:'ready',message:'Cambios preparados en tu proyecto original.',files:['src/dotacion.js'],diff:'Cambios de prueba',summary:'Implementación preparada para revisar.',checks:[{name:'Pruebas del proyecto',status:'passed',output:'316 pruebas aprobadas.'}]},...Array.from({length:5},(_,i)=>({id:'old-'+i,status:'failed',message:'Ejecución anterior sin cambios.'}))];let submitted;let chats=0;let publishRequests=0;
   await page.route('**/api/chat',r=>{chats++;return r.fulfill({status:500,json:{message:'No debe enviarse al chat'}})});
   await page.route('http://127.0.0.1:3002/api/bridge/**',route=>{
    const url=new URL(route.request().url());let value;
@@ -29,6 +29,9 @@ const server=http.createServer((req,res)=>{
    else if(url.pathname==='/api/bridge/tickets/erp/list')value=erp;
    else if(url.pathname==='/api/bridge/tickets/erp/run'){submitted=route.request().postDataJSON();value={id:'22222222-2222-4222-8222-222222222222',status:'ready',message:'Ticket de prueba preparado.'};jobs=[value,...jobs];}
    else if(url.pathname==='/api/bridge/tickets')value=jobs;
+   else if(url.pathname.endsWith('/open'))value={opened:true,file:'src/dotacion.js'};
+   else if(url.pathname.endsWith('/publish-plan'))value={token:'a'.repeat(64),branch:'main',remote:'https://github.com/example/ohlimpiaerp.git',project:'ohlimpiaerp',files:['src/dotacion.js'],diff:'Cambios de prueba'};
+   else if(url.pathname.endsWith('/publish')){publishRequests++;assert.equal(route.request().postDataJSON().reviewed,true);assert.equal(route.request().postDataJSON().token,'a'.repeat(64));jobs[0]={...jobs[0],publication:{status:'published',message:'Commit subido y despliegue completado.',commit:'a'.repeat(40),url:'https://test-deployment.vercel.app'}};value=jobs[0];}
    else return route.fulfill({status:503,json:{message:'Prueba sin motor de voz real'}});
    return route.fulfill({json:value,headers:{'Access-Control-Allow-Origin':'*'}});
   });
@@ -40,6 +43,11 @@ const server=http.createServer((req,res)=>{
   const composer=await page.locator('.command-composer').boundingBox();assert(composer.y+composer.height<=1000);
   await page.screenshot({path:'artifacts/workspace-communication.png'});
   await sector('Tickets').click();assert(await page.locator('.erp-inbox').isVisible());assert(!(await chat.isVisible()));assert.equal(await page.locator('.ticket-job').count(),1);
+  await page.getByRole('button',{name:'Abrir cambios en VS Code',exact:true}).click();await page.getByText('Abrí OhlimpiaERP en VS Code y el archivo src/dotacion.js.').first().waitFor();
+  assert(await page.getByText('Informe para Lautaro · cambios y qué probar',{exact:true}).isVisible());
+  await page.getByRole('button',{name:'Commit y deploy',exact:true}).click();
+  const confirmPublish=page.getByRole('button',{name:'Confirmar commit y deploy',exact:true});await confirmPublish.waitFor();assert(await confirmPublish.isDisabled());assert.equal(publishRequests,0);
+  await page.getByRole('checkbox',{name:/Revisé los cambios y qué probar/}).check();await confirmPublish.click();await page.getByRole('link',{name:'Abrir publicación y probar'}).waitFor();assert.equal(publishRequests,1);assert.equal(await page.getByRole('button',{name:'Commit y deploy',exact:true}).count(),0);
   await page.screenshot({path:'artifacts/workspace-tickets.png'});
   await page.getByRole('button',{name:'Ver historial · 6',exact:true}).click();assert.equal(await page.locator('.ticket-job').count(),6);assert.equal(await page.evaluate(()=>document.documentElement.scrollHeight>innerHeight),false);
   await page.locator('.local-view').evaluate(el=>el.scrollTop=el.scrollHeight);

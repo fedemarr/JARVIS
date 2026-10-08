@@ -7,6 +7,7 @@ import { execFileSync } from 'node:child_process';
 import { TicketRunner } from './tickets';
 import { readTicketFile,writeTicketFile,listTicketFiles } from './ticketFiles';
 import { createBridgeToken,validBridgeToken } from '../security/bridge';
+import { TicketPublisher } from './ticketPublish';
 
 async function fixture() {
   const root=await fs.mkdtemp(path.join(os.tmpdir(),'jarvis-tickets-'));
@@ -50,6 +51,51 @@ test('ticket: fallo en las pruebas no se presenta como tarea resuelta',async()=>
   const data=await fixture();const runner=new TicketRunner(data.config,data.root,async()=> 'Sin cambios.');
   try{const job=await runner.start({project:'ohlimpiaerp',instruction:'Resolver el ticket de suma.'});const finished=await terminal(runner,job.id);assert.equal(finished.status,'failed');assert(finished.checks?.some(c=>c.status==='failed'));}
   finally{runner.close();await data.clean();}
+});
+
+test('publicación: revisa destino, detecta cambios posteriores y exige aprobación vigente',async()=>{
+  const data=await fixture();
+  const git=(args:string[])=>execFileSync('git',args,{cwd:data.project,windowsHide:true,encoding:'utf8'});
+  git(['add','sum.js']);git(['-c','user.name=Test','-c','user.email=test@localhost','commit','-m','user baseline']);
+  git(['remote','add','origin','https://github.com/example/ohlimpiaerp.git']);
+  await fs.mkdir(path.join(data.project,'.vercel'));
+  await fs.writeFile(path.join(data.project,'.vercel','project.json'),JSON.stringify({projectName:'ohlimpiaerp',projectId:'prj_test',orgId:'team_test'}));
+  const runner=new TicketRunner(data.config,data.root,async()=>{await writeTicketFile(data.project,'sum.js','export const sum=(a,b)=>a+b;');return 'Qué cambió: suma. Qué probar: sumar.';});
+  try{
+    const started=await runner.start({project:'ohlimpiaerp',instruction:'Resolver el ticket de suma.'});
+    const job=await terminal(runner,started.id);
+    const publisher=new TicketPublisher(data.project,path.join(data.root,'data','ticket-jobs',job.id));
+    const plan=await runner.publishPlan(job.id);
+    assert.equal(plan.project,'ohlimpiaerp');assert.equal(plan.remote,'https://github.com/example/ohlimpiaerp.git');assert(plan.diff.includes('a+b'));
+    await assert.rejects(runner.publish(job.id,{token:plan.token,reviewed:false}));
+    await assert.rejects(runner.publish(job.id,{token:'0'.repeat(64),reviewed:true}),/cambió desde la revisión/);
+    assert.equal(git(['log','-1','--format=%s']).trim(),'user baseline');
+    await fs.writeFile(path.join(data.project,'sum.js'),'export const sum=(a,b)=>a+b+1;');
+    await assert.rejects(publisher.plan(job),/cambió después de las pruebas/);
+    await fs.writeFile(path.join(data.project,'sum.js'),'export const sum=(a,b)=>a+b;');
+    await assert.rejects(publisher.plan({...job,checks:[{name:'tests',status:'failed',output:'fallo'}]}),/comprobaciones/);
+    git(['config','user.name','Test']);git(['config','user.email','test@localhost']);
+    await fs.writeFile(path.join(data.project,'ticket.md'),'Otro cambio del usuario, ya staged.');git(['add','ticket.md']);
+    let pushed=false;const states:NonNullable<typeof job.publication>[]=[];
+    const publishing=new TicketPublisher(data.project,path.join(data.root,'data','ticket-jobs',job.id),{
+      push:async()=>{pushed=true;},
+      deploy:async directory=>{
+        assert(pushed);assert((await fs.readFile(path.join(directory,'sum.js'),'utf8')).includes('a+b'));
+        assert.equal(await fs.readFile(path.join(directory,'ticket.md'),'utf8'),'La suma da un resultado incorrecto.');
+        return 'https://test-deployment.vercel.app';
+      }
+    });
+    await publishing.publish(job,plan,async publication=>{states.push(publication);});
+    assert.equal(states.at(-1)?.status,'published');assert.equal(states.at(-1)?.url,'https://test-deployment.vercel.app');
+    assert.equal(git(['show','--format=','--name-only','HEAD']).trim(),'sum.js');
+    assert.equal(git(['diff','--cached','--name-only']).trim(),'ticket.md','conserva cambios ajenos staged');
+    const committedJob={...job,publication:states.at(-1)};
+    let failed:typeof job.publication;
+    const failing=new TicketPublisher(data.project,path.join(data.root,'data','ticket-jobs',job.id),{push:async()=>{throw new Error('No hay conexión');}});
+    await failing.publish(committedJob,await failing.plan(committedJob),async publication=>{failed=publication;});
+    assert.equal(failed?.status,'failed');assert.equal(failed?.commit,states.at(-1)?.commit);
+    assert.equal(git(['rev-parse','HEAD']).trim(),failed?.commit,'no duplica el commit al reintentar');
+  }finally{runner.close();await data.clean();}
 });
 test('ticket: límites de archivos y credencial distinta del puente de lectura',async()=>{
   const data=await fixture();

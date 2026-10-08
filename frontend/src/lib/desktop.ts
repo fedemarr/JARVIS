@@ -33,7 +33,7 @@ export async function desktopFetch(url:string,init:RequestInit={}):Promise<Respo
   return response;
 }
 export async function ticketFetch(url:string,init:RequestInit={}):Promise<Response> {
-  if(!/^\/api\/tickets(?:\/status|\/[a-f0-9-]{36}\/(?:cancel|open|retry)|\/erp\/(?:status|list|connect|download|run))?$/.test(url))throw new Error('Operación de tickets no disponible.');
+  if(!/^\/api\/tickets(?:\/status|\/[a-f0-9-]{36}\/(?:cancel|open|retry|publish-plan|publish)|\/erp\/(?:status|list|connect|download|run))?$/.test(url))throw new Error('Operación de tickets no disponible.');
   if(local)return apiFetch(url,init);
   if(!ticketCredential || ticketCredential.until<=Date.now()) {
     issuingTicket ??= (async()=>{

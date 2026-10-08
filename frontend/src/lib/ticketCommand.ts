@@ -1,10 +1,22 @@
 const normalize=(text:string)=>text.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase();
+type PendingTicket={id:string;title:string;state:string};
+let pendingTickets:PendingTicket[]=[];
+export function setTicketContext(tickets:PendingTicket[]){pendingTickets=tickets.filter(t=>/^(abierto|en progreso)$/i.test(t.state));}
+window.addEventListener('jarvis-logout',()=>{pendingTickets=[];});
 
 export function parseTicketCommand(text:string):{action:'list'|'run';selector?:string;erp:boolean}|undefined {
   const clean=normalize(text);
-  if(!/\btickets?\b/.test(clean) || /\b(?:no|nunca)\s+(?:quiero\s+que\s+)?(?:resuelv|resolv|hag|hac|ejecut|implement)/.test(clean))return;
+  if(/\b(?:no|nunca)\s+(?:quiero\s+que\s+)?(?:resuelv|resolv|hag|hac|ejecut|implement)/.test(clean))return;
   const erp=/ohlimpia|\berp\b|bandeja|\bweb\b/.test(clean);
   const execute=/\b(?:resolve|resolver|resuelve|resuelvas|resolvelo|implementa|implementar|implementes|hace|hacer|haz|hagas|realiza|realizar|ejecuta|ejecutar|trabaja)\b/.test(clean);
+  const namedTickets=pendingTickets.filter(ticket=>{
+    const title=normalize(ticket.title),at=clean.indexOf(title);if(at<0)return false;
+    const before=clean.slice(0,at).trim(),after=clean.slice(at+title.length).replace(/[.,!?]/g,'').trim();
+    const selection=/^(?:(?:jarvis|el|la|de|quiero|ese|esa)\s*[, :]*)*$/.test(before) && /^(?:(?:de|del|entre)\s+(?:los\s+)?tickets?\s+(?:(?:q|que)\s+estan\s+)?(?:abiertos|pendientes))?$/.test(after);
+    return (execute && (!at || /[\s"“«']/.test(clean[at-1])) && (!clean[at+title.length] || /[\s"”»',.!?]/.test(clean[at+title.length]))) || selection;
+  });
+  if(namedTickets.length===1)return {action:'run',selector:namedTickets[0].id,erp:true};
+  if(!/\btickets?\b/.test(clean))return;
   if(!execute){
     if(erp && /\b(?:que|cuales|ver|mostra|mostrame|mostrar|lista|listar|busca|buscar)\b/.test(clean))return {action:'list',erp:true};
     return;

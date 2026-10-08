@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react';
 import { ticketFetch } from '../lib/desktop';
-import { parseTicketCommand } from '../lib/ticketCommand';
+import { parseTicketCommand, setTicketContext } from '../lib/ticketCommand';
 
-type Job={id:string;status:string;message:string;summary?:string;diff?:string;files?:string[];checks?:{name:string;status:string;output:string}[]};
+type Job={id:string;status:string;message:string;editorOpened?:boolean;editorError?:string;summary?:string;diff?:string;files?:string[];checks?:{name:string;status:string;output:string}[]};
 type ErpTicket={id:string;number:string;title:string;priority:string;state:string};
 const running=(job:Job)=>['preparing','coding','checking'].includes(job.status);
 const labels:Record<string,string>={preparing:'Preparando proyecto',coding:'Claude está trabajando',checking:'Ejecutando comprobaciones',ready:'Preparado para revisar',failed:'Requiere atención',cancelled:'Detenido'};
@@ -22,6 +22,9 @@ export function TicketAgentPanel({ticketPath}:{ticketPath:string}) {
   }
   useEffect(()=>{
     let active=true;
+    void ticketFetch('/api/tickets/erp/list',{signal:AbortSignal.timeout(60000)}).then(async response=>{
+      if(!response.ok)return;const rows=await response.json();if(active){setTicketContext(rows);setErpTickets([...rows.filter((t:ErpTicket)=>/^(abierto|en progreso)$/i.test(t.state)),...rows.filter((t:ErpTicket)=>!/^(abierto|en progreso)$/i.test(t.state))]);}
+    }).catch(()=>{});
     void ticketFetch('/api/tickets/status',{signal:AbortSignal.timeout(15000)}).then(async response=>{
       if(!response.ok)throw new Error();const status=await response.json();
       if(active){setAvailable(status.available===true);setNotice(status.available?'Claude Code conectado · usa tu sesión local':'Iniciá sesión en Claude Code en esta PC.');}
@@ -35,10 +38,10 @@ export function TicketAgentPanel({ticketPath}:{ticketPath:string}) {
     if(!available){setNotice('Claude Code necesita una sesión local activa.');return;}
     setBusy(true);
     try {
-      const response=await ticketFetch(fromErp?'/api/tickets/erp/run':'/api/tickets',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(fromErp?{selector:fromErp,instruction:text}:{project:'ohlimpiaerp',instruction:text,...(ticketPath?{ticketPath}:{})}),signal:AbortSignal.timeout(fromErp?180000:20000)});
+      const response=await ticketFetch(fromErp?'/api/tickets/erp/run':'/api/tickets',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(fromErp?{selector:fromErp,instruction:text.length<10?'Resolvé el ticket seleccionado: '+text:text,openEditor:true}:{project:'ohlimpiaerp',instruction:text,openEditor:true,...(ticketPath?{ticketPath}:{})}),signal:AbortSignal.timeout(fromErp?180000:20000)});
       const data=await response.json();if(!response.ok)throw new Error(data.message);
       setJobs(previous=>[data,...previous]);setNotice('Ticket iniciado. Podés seguir usando el chat mientras Claude trabaja.');
-      window.dispatchEvent(new CustomEvent('jarvis-ticket-notice',{detail:'Inicié el ticket con Claude Code. Verás los cambios y las comprobaciones en el panel de OhlimpiaERP.'}));
+      window.dispatchEvent(new CustomEvent('jarvis-ticket-notice',{detail:'Inicié el ticket con Claude Code. Voy a abrir la copia en VS Code para que sigas los cambios. Las comprobaciones aparecerán en el panel.'}));
     } catch(e){const message=e instanceof Error?e.message:'No pude iniciar el ticket.';setNotice(message);window.dispatchEvent(new CustomEvent('jarvis-ticket-notice',{detail:message}));}
     finally{setBusy(false);}
   }
@@ -68,6 +71,7 @@ export function TicketAgentPanel({ticketPath}:{ticketPath:string}) {
       if(action==='connect')setErpNotice(data.message);
       else {
         const pending=data.filter((ticket:ErpTicket)=>/^(abierto|en progreso)$/i.test(ticket.state));
+        setTicketContext(data);
         const completed=data.filter((ticket:ErpTicket)=>!/^(abierto|en progreso)$/i.test(ticket.state));
         setErpTickets([...pending,...completed]);
         setErpNotice(`Encontré ${data.length} tickets: ${pending.length} pendientes. «Siguiente» toma el primer pendiente en el orden de la bandeja.`);
@@ -94,6 +98,8 @@ export function TicketAgentPanel({ticketPath}:{ticketPath:string}) {
     <p>Prepara los cambios en una copia separada y ejecuta comprobaciones. Revisá el resultado antes de integrarlo; no publica ni cierra el ticket.</p>
     {jobs.slice(0,5).map(job=><article key={job.id} className="ticket-job">
       <strong>{labels[job.status] || job.status}</strong><p>{job.message}</p>
+      {job.editorOpened && <p>Copia del ticket abierta en VS Code · Claude Code está conectado al ejecutor local.</p>}
+      {job.editorError && <p role="status">{job.editorError}</p>}
       {running(job)?<button type="button" onClick={()=>void action(job.id,'cancel')}>Detener tarea</button>:<button type="button" onClick={()=>void action(job.id,'open')}>Abrir cambios en VS Code</button>}
       {job.summary && <details><summary>Resumen de Claude</summary><pre>{job.summary}</pre></details>}
       {job.checks && <details><summary>Comprobaciones</summary>{job.checks.map((check,index)=><div key={index}><strong>{check.status==='passed'?'✓':check.status==='failed'?'✕':'Pendiente'} · {check.name}</strong><pre>{check.output}</pre></div>)}</details>}

@@ -52,11 +52,11 @@ export function buildDesktopApp(config:DesktopConfig,root:string,cloud='https://
     app.post(prefix+'/erp/connect',async()=>erp.connect());
     app.post(prefix+'/erp/download',async(request)=>erp.download(z.object({selector:z.string().trim().min(1).max(150)}).strict().parse(request.body).selector));
     app.post(prefix+'/erp/run',async(request,reply)=>{
-      const {selector,instruction}=z.object({selector:z.string().trim().min(1).max(150),instruction:z.string().trim().min(10).max(32000)}).strict().parse(request.body);
+      const {selector,instruction,openEditor}=z.object({selector:z.string().trim().min(1).max(150),instruction:z.string().trim().min(10).max(32000),openEditor:z.boolean().optional()}).strict().parse(request.body);
       if((await tickets.status()).active)return reply.code(409).send({message:'Ya hay un ticket en ejecución.'});
       const downloaded=await erp.download(selector);
       if(downloaded.skipped.length)return reply.code(400).send({message:'El ticket tiene adjuntos que requieren revisión: '+downloaded.skipped.join(', ')});
-      return reply.code(202).send(await tickets.start({project:'ohlimpiaerp',instruction,ticketPath:downloaded.ticketPath,referencePaths:downloaded.referencePaths}));
+      return reply.code(202).send(await tickets.start({project:'ohlimpiaerp',instruction,ticketPath:downloaded.ticketPath,referencePaths:downloaded.referencePaths,openEditor}));
     });
     app.get(prefix+'/status',async()=>tickets.status());
     app.get(prefix,async()=>tickets.list());

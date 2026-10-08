@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { LlmMessage } from '../../../shared/llm';
 import { apiFetch } from '../lib/api';
 
@@ -69,6 +69,9 @@ export const useChat = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [toolCards, setToolCards] = useState<ToolCardData[]>([]);
   const [pendingConfirmations, setPendingConfirmations] = useState<ConfirmationData[]>([]);
+  const requestRef=useRef<AbortController>();
+  const cancelResponse=useCallback(()=>requestRef.current?.abort(),[]);
+  useEffect(()=>()=>requestRef.current?.abort(),[]);
 
   const selectConversation = useCallback(async (id: string | undefined) => {
     setCurrentConversationId(id);
@@ -106,6 +109,9 @@ export const useChat = () => {
 
   const sendMessage = useCallback(
     async (text: string, conversationId?: string, onToken?: (delta: string) => void): Promise<string | null> => {
+      if(requestRef.current)return null;
+      const controller=new AbortController();
+      requestRef.current=controller;
       setIsLoading(true);
       setToolCards([]);
       setPendingConfirmations([]);
@@ -117,6 +123,7 @@ export const useChat = () => {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ conversationId, message: text }),
+          signal: controller.signal,
         });
 
         if (!response.ok || !response.body) {
@@ -129,6 +136,7 @@ export const useChat = () => {
 
         while (true) {
           const { value, done } = await reader.read();
+          controller.signal.throwIfAborted();
           if (done) break;
 
           buffer += decoder.decode(value, { stream: true });
@@ -136,6 +144,7 @@ export const useChat = () => {
           buffer = blocks.pop() || '';
 
           for (const block of blocks) {
+            controller.signal.throwIfAborted();
             if (!block.includes('data: ')) continue;
             const { event: eventType, data } = parseSseStream([block])[0] || {};
             if (!eventType) continue;
@@ -189,9 +198,11 @@ export const useChat = () => {
           }
         }
       } catch (error) {
+        if(controller.signal.aborted)return null;
         console.error('Error sending message:', error);
         setMessages((prev) => [...prev, { role: 'assistant', text: 'Error: Could not connect to JARVIS.' }]);
       } finally {
+        if(requestRef.current===controller)requestRef.current=undefined;
         setIsLoading(false);
       }
 
@@ -223,6 +234,7 @@ export const useChat = () => {
     input,
     setInput,
     sendMessage,
+    cancelResponse,
     currentConversationId,
     conversations,
     selectConversation,

@@ -48,8 +48,13 @@ async function run() {
     await page.addInitScript(() => {
       window.spoken = [];
       window.recognitionStarts = 0;
+      window.interruptionStarts = 0;
       window.webkitSpeechRecognition = class {
-        start() { window.recognitionStarts++; window.lastRecognition = this; this.active = true; }
+        start() {
+          if(this.continuous){window.interruptionStarts++;window.lastInterruptionRecognition=this;}
+          else {window.recognitionStarts++;window.lastRecognition=this;}
+          this.active = true;
+        }
         stop() { this.active = false; this.onend?.(); }
         abort() { this.active = false; this.onend?.(); }
       };
@@ -102,6 +107,7 @@ async function run() {
     await page.getByText(replyParts.join(''), { exact: true }).waitFor();
     await page.waitForFunction(() => window.spoken.length === 3);
     await page.getByRole('button',{name:'Activar manos libres'}).click();
+    await page.waitForFunction(()=>window.lastInterruptionRecognition?.active);
     assert.equal(await page.evaluate(()=>window.recognitionStarts),0,'Activar manos libres durante la lectura debe esperar sin cancelar la respuesta');
     for (let i = 0; i < replyParts.length; i++) {
       assert.equal((await page.evaluate(index => window.spoken[index + 2], i)).trim(), replyParts[i].trim());

@@ -29,6 +29,7 @@ html, body, #root { overflow: hidden; }
 .chat-panel .conversation-feed { overscroll-behavior: contain; }
 .chat-panel .composer-wrap { padding: 14px 18px; }
 .feed-heading { letter-spacing: .8px; }
+.stop-reply-button { padding: 7px 10px; border: 1px solid #ab7952; border-radius: 5px; color: #ffcea7; background: #34241e; font-size: 11px; }
 .local-view { flex: 1; min-height: 0; overflow: auto; padding: 24px 28px; overscroll-behavior: contain; }
 .local-view .desktop-panel { margin: 0; padding: 0; background: transparent; border: 0; }
 .desktop-panel > .eyebrow { display: block; margin-bottom: 16px; }

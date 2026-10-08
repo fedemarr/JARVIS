@@ -9,6 +9,7 @@ const RecognitionCtor: SpeechRecognitionConstructor | undefined =
       : undefined;
 
 class BrowserStt implements SttProvider {
+  constructor(private readonly continuous=false) {}
   readonly supported = RecognitionCtor !== undefined;
   private recognition: SpeechRecognition | null = null;
   private finalTranscript = '';
@@ -22,7 +23,7 @@ class BrowserStt implements SttProvider {
 
     const recognition = new RecognitionCtor();
     recognition.lang = 'es-AR';
-    recognition.continuous = false;
+    recognition.continuous = this.continuous;
     recognition.interimResults = true;
     recognition.maxAlternatives = 1;
     this.finalTranscript = '';
@@ -34,7 +35,8 @@ class BrowserStt implements SttProvider {
         const result = event.results[i];
         const transcript = result[0].transcript;
         if (result.isFinal) {
-          this.finalTranscript += transcript;
+          if(this.continuous)this.onFinalCb(transcript);
+          else this.finalTranscript += transcript;
         } else {
           interim += transcript;
         }
@@ -299,3 +301,5 @@ export function createBrowserVoice() {
   }
   return { stt, tts };
 }
+
+export const createInterruptionListener=():SttProvider=>new BrowserStt(true);

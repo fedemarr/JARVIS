@@ -12,7 +12,9 @@ import { useAccess } from './components/AccessGate';
 import { MicButton } from './components/MicButton';
 import { ToolCard } from './components/ToolCard';
 import { ConfirmDialog } from './components/ConfirmDialog';
-import { createBrowserVoice } from './lib/browserVoice';
+import { createBrowserVoice, createInterruptionListener } from './lib/browserVoice';
+import { isStopReplyCommand } from './lib/voiceCommands';
+import { useReplyInterrupt } from './hooks/useReplyInterrupt';
 import { LlmMessage } from '../../shared/llm';
 
 function App() {
@@ -40,6 +42,7 @@ function App() {
   const {
     messages,
     sendMessage,
+    cancelResponse,
     currentConversationId,
     conversations,
     selectConversation,
@@ -51,6 +54,8 @@ function App() {
   } = useChat();
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const commandBusyRef = useRef(false);
+  const stopReplyRef = useRef<()=>void>(()=>{});
+  const replyInterruptedRef = useRef(false);
   const localNoticeVoiceRef=useRef<(text:string)=>void>(()=>{});
   const routeTicket = (text:string) => {
     if(!parseTicketCommand(text))return false;
@@ -65,11 +70,13 @@ function App() {
   },[addSystemMessage]);
 
   const voice = useMemo(() => createBrowserVoice(), []);
+  const interruptionListener = useMemo(() => createInterruptionListener(), []);
 
   const speech = useSpeech({
     stt: voice.stt,
     tts: voice.tts,
     onCommand: (text) => {
+      if(isStopReplyCommand(text)){stopReplyRef.current();return;}
       if (isLoading) return;
       if (!handsFree) { void commandRef.current(text); return; }
       const wake = text.match(/\b(?:jarvis|y arvis|yarvis)\b[\s,.:;!?¿¡]*(.*)/i);
@@ -88,9 +95,21 @@ function App() {
     },
   });
   localNoticeVoiceRef.current=(text)=>speech.speak(text);
+  useReplyInterrupt({listener:interruptionListener,enabled:handsFree && (isLoading || speech.orbState==='SPEAKING'),onStop:()=>stopReplyRef.current(),isEcho:speech.isSpeechEcho});
 
   const pendingSpeechRef = useRef('');
   const speakingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  stopReplyRef.current=()=>{
+    replyInterruptedRef.current=true;
+    pendingSpeechRef.current='';
+    if(speakingTimerRef.current){clearTimeout(speakingTimerRef.current);speakingTimerRef.current=null;}
+    cancelResponse();
+    speech.abortListening();
+    speech.cancelSpeaking();
+    setVoiceAwake(false);
+    setCoreGreeting('');
+    setVoiceNotice('Respuesta detenida. Decí «Jarvis» cuando me necesites.');
+  };
 
   const flushSpeech = useCallback(() => {
     if (speakingTimerRef.current) {
@@ -104,6 +123,7 @@ function App() {
 
   const handleStreamToken = useCallback(
     (delta: string) => {
+      if(replyInterruptedRef.current)return;
       pendingSpeechRef.current += delta;
       const acc = pendingSpeechRef.current;
       // Cortar en oraciones: punto, signo, salto de línea o al superar 200 chars.
@@ -134,9 +154,12 @@ function App() {
 
   const commandRef = useRef<(text: string) => Promise<void>>(async () => {});
   commandRef.current = async (text: string) => {
+    if(isStopReplyCommand(text)){stopReplyRef.current();return;}
     if(routeTicket(text)){setInput('');return;}
     if (commandBusyRef.current) return;
     commandBusyRef.current = true;
+    replyInterruptedRef.current=false;
+    setVoiceNotice('');
     try {
     setInput('');
     setCoreGreeting('');
@@ -145,7 +168,7 @@ function App() {
     speech.setThinking();
     pendingSpeechRef.current = '';
     const reply = await sendMessage(text, currentConversationId, handleStreamToken);
-    if (reply) {
+    if (reply && !replyInterruptedRef.current) {
       finishStreamSpeech();
     } else {
       speech.setOrbState('IDLE');
@@ -214,9 +237,12 @@ function App() {
   const handleSendText = async (e: React.FormEvent) => {
     e.preventDefault();
     const text = input.trim();
+    if(isStopReplyCommand(text)){stopReplyRef.current();setInput('');return;}
     if (!text || isLoading || commandBusyRef.current) return;
     if(routeTicket(text)){setInput('');return;}
     commandBusyRef.current = true;
+    replyInterruptedRef.current=false;
+    setVoiceNotice('');
     try {
     setInput('');
     setCoreGreeting('');
@@ -225,7 +251,7 @@ function App() {
     speech.setThinking();
     pendingSpeechRef.current = '';
     const reply = await sendMessage(text, currentConversationId, handleStreamToken);
-    if (reply) {
+    if (reply && !replyInterruptedRef.current) {
       finishStreamSpeech();
     } else {
       speech.setOrbState('IDLE');
@@ -315,9 +341,10 @@ function App() {
             <MicButton listening={speech.orbState === 'LISTENING'} supported={speech.sttSupported} onStart={() => { setHandsFree(false); setVoiceAwake(false); speech.startListening(); }} onStop={speech.stopListening} />
             <textarea aria-label="Mensaje para Jarvis" rows={2} value={inputValue} onChange={(e) => setInput(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) { e.preventDefault(); e.currentTarget.form?.requestSubmit(); } }} placeholder={speech.orbState === 'LISTENING' ? 'Te escucho…' : 'Escribí tu próxima misión…'} />
             <button type="button" onClick={speech.toggleMute} aria-label={speech.isMuted ? 'Activar voz' : 'Silenciar voz'} title={speech.isMuted ? 'Activar voz' : 'Silenciar voz'} className="voice-toggle">{speech.isMuted ? <MutedIcon /> : <SpeakerIcon />}</button>
-            <button type="submit" disabled={isLoading || !input.trim()} className="send-button" aria-label="Enviar mensaje">↗</button>
+            <button type="submit" disabled={(isLoading && !isStopReplyCommand(input)) || !input.trim()} className="send-button" aria-label="Enviar mensaje">↗</button>
           </form>
           <div className="handsfree-controls">
+            {(isLoading || speech.orbState==='SPEAKING') && <button type="button" className="stop-reply-button" onClick={()=>stopReplyRef.current()}>Detener respuesta</button>}
             <button type="button" className={handsFree ? 'handsfree-toggle handsfree-active' : 'handsfree-toggle'} aria-pressed={handsFree} disabled={!speech.sttSupported || !speech.ttsSupported} onClick={() => {
               setVoiceNotice('');
               setVoiceAwake(false);
@@ -328,7 +355,7 @@ function App() {
                 if (!isLoading && !commandBusyRef.current && speech.orbState === 'IDLE') speech.startListening();
               }
             }}>{handsFree ? 'Desactivar manos libres' : 'Activar manos libres'}</button>
-            <span role="status">{handsFree ? isLoading || speech.orbState === 'SPEAKING' ? 'Manos libres activo · te escucho cuando termine la respuesta' : voiceAwake ? 'Conversación activa · te escucho al terminar de hablar' : 'Decí «Jarvis» para llamarme' : !speech.sttSupported ? 'Reconocimiento de voz no disponible en este navegador' : 'Activá el micrófono una vez y después decí «Jarvis»'}</span>
+            <span role="status">{handsFree ? isLoading || speech.orbState === 'SPEAKING' ? 'Decí «gracias, Jarvis» para detener la respuesta' : voiceAwake ? 'Conversación activa · te escucho al terminar de hablar' : 'Decí «Jarvis» para llamarme' : !speech.sttSupported ? 'Reconocimiento de voz no disponible en este navegador' : 'Activá el micrófono una vez y después decí «Jarvis»'}</span>
           </div>
           {voiceNotice && <p className="voice-notice" role="alert">{voiceNotice}</p>}
           <div className="composer-footer"><span>ENTER para enviar · SHIFT + ENTER para nueva línea</span>

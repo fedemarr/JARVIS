@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { SttProvider, TtsProvider, OrbState, TtsVoice } from '../../../shared/voice';
+import { normalizeVoiceCommand } from '../lib/voiceCommands';
 
 export interface UseSpeechOptions {
   stt: SttProvider;
@@ -16,6 +17,7 @@ export function useSpeech({ stt, tts, onCommand }: UseSpeechOptions) {
   const [voices, setVoices] = useState<TtsVoice[]>(() => tts.listVoices());
   const [selectedVoice, setSelectedVoice] = useState<string | null>(() => tts.getSelectedVoice());
   const listeningRef = useRef(false);
+  const spokenEchoRef = useRef('');
   const onCommandRef = useRef(onCommand);
   onCommandRef.current = onCommand;
 
@@ -60,6 +62,7 @@ export function useSpeech({ stt, tts, onCommand }: UseSpeechOptions) {
   const startListening = useCallback(() => {
     if (listeningRef.current) return;
     tts.cancel();
+    spokenEchoRef.current='';
     listeningRef.current = true;
     setPartialTranscript('');
     setOrbState('LISTENING');
@@ -83,6 +86,7 @@ export function useSpeech({ stt, tts, onCommand }: UseSpeechOptions) {
       if (force) { tts.setMuted(false); setIsMuted(false); }
       if (tts.isMuted()) return;
       if (listeningRef.current) {listeningRef.current = false;stt.abort();setPartialTranscript('');}
+      spokenEchoRef.current=(spokenEchoRef.current+' '+normalizeVoiceCommand(text)).slice(-32000);
       setOrbState('SPEAKING');
       tts.speak(text);
     },
@@ -91,8 +95,10 @@ export function useSpeech({ stt, tts, onCommand }: UseSpeechOptions) {
 
   const cancelSpeaking = useCallback(() => {
     tts.cancel();
+    spokenEchoRef.current='';
     setOrbState('IDLE');
   }, [tts]);
+  const isSpeechEcho=useCallback((text:string)=>spokenEchoRef.current.includes(normalizeVoiceCommand(text)),[]);
 
   const toggleMute = useCallback(() => {
     setIsMuted((prev) => {
@@ -133,6 +139,7 @@ export function useSpeech({ stt, tts, onCommand }: UseSpeechOptions) {
     abortListening,
     speak,
     cancelSpeaking,
+    isSpeechEcho,
     toggleMute,
     setThinking,
     setError,

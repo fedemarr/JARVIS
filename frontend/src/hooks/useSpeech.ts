@@ -117,6 +117,7 @@ export function useSpeech({ stt, tts, onCommand }: UseSpeechOptions) {
     },
     [tts],
   );
+  const activateAudio=useCallback(()=>{tts.setMuted(false);setIsMuted(false);tts.activate?.();},[tts]);
 
   const setThinking = useCallback(() => setOrbState('THINKING'), []);
 
@@ -134,6 +135,7 @@ export function useSpeech({ stt, tts, onCommand }: UseSpeechOptions) {
     voices,
     selectedVoice,
     changeVoice,
+    activateAudio,
     startListening,
     stopListening,
     abortListening,

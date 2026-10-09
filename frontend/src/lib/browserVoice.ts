@@ -1,6 +1,16 @@
 import { SttProvider, TtsProvider, SttEndReason, TtsVoice } from '../../../shared/voice';
 import { desktopFetch, desktopConnected, naturalVoiceAvailable } from './desktop';
 import { prepareSpokenText, splitSpokenText } from './spokenText';
+import {mobileDevice} from './mobile';
+
+let activeCapture:SpeechRecognition|null=null;
+let captureReleasedAt=0;
+const voiceError=(message:string)=>window.dispatchEvent(new CustomEvent('jarvis-voice-error',{detail:message}));
+function awaitCaptureEnd(recognition:SpeechRecognition){
+  const release=()=>{clearTimeout(timer);recognition.onend=null;if(activeCapture===recognition){activeCapture=null;captureReleasedAt=Date.now();}};
+  const timer=window.setTimeout(release,2500);
+  recognition.onend=release;
+}
 
 const RecognitionCtor: SpeechRecognitionConstructor | undefined =
   typeof webkitSpeechRecognition !== 'undefined'
@@ -13,6 +23,7 @@ class BrowserStt implements SttProvider {
   constructor(private readonly continuous=false) {}
   readonly supported = RecognitionCtor !== undefined;
   private recognition: SpeechRecognition | null = null;
+  private pendingStart:number|undefined;
   private finalTranscript = '';
   private onIntermediateCb: (text: string) => void = () => {};
   private onFinalCb: (text: string) => void = () => {};
@@ -21,6 +32,10 @@ class BrowserStt implements SttProvider {
   start(): void {
     if (!this.supported || !RecognitionCtor) return;
     if (this.recognition) return;
+    if(this.pendingStart!==undefined)return;
+    if(activeCapture || mobileDevice&&Date.now()-captureReleasedAt<250){
+      this.pendingStart=window.setTimeout(()=>{this.pendingStart=undefined;this.start();},150);return;
+    }
 
     const recognition = new RecognitionCtor();
     recognition.lang = 'es-AR';
@@ -45,16 +60,18 @@ class BrowserStt implements SttProvider {
       if (interim) {
         this.onIntermediateCb(interim);
       }
+      if(mobileDevice&&!this.continuous&&this.finalTranscript){try{recognition.stop();}catch{}}
     };
 
     recognition.onerror = (event: SpeechRecognitionErrorEvent) => {
       if (this.recognition !== recognition) return;
-      this.cleanup();
+      this.cleanup(false);awaitCaptureEnd(recognition);
       if (event.error === 'no-speech') {
         this.onEndCb('no-speech');
       } else if (event.error === 'aborted') {
         this.onEndCb('aborted');
       } else {
+        voiceError(event.error==='not-allowed'||event.error==='service-not-allowed'?'El navegador bloqueó el micrófono. Permití su acceso y volvé a activar manos libres.':event.error==='audio-capture'?'El micrófono está ocupado o no está disponible. Cerrá otras apps que lo usen y volvé a intentarlo.':'Se interrumpió el reconocimiento de voz. Volvé a activar manos libres.');
         this.onEndCb('error');
       }
     };
@@ -70,6 +87,7 @@ class BrowserStt implements SttProvider {
     };
 
     this.recognition = recognition;
+    activeCapture=recognition;
     try {
       recognition.start();
     } catch {
@@ -80,19 +98,20 @@ class BrowserStt implements SttProvider {
 
   stop(): void {
     if (this.recognition) {
-      this.recognition.stop();
+      try{this.recognition.stop();}catch{this.abort();}
     }
   }
 
   abort(): void {
+    if(this.pendingStart!==undefined){clearTimeout(this.pendingStart);this.pendingStart=undefined;}
     const recognition = this.recognition;
-    this.cleanup();
+    this.cleanup(false);
     this.finalTranscript = '';
     if (!recognition) return;
     recognition.onresult = null;
     recognition.onerror = null;
-    recognition.onend = null;
-    recognition.abort();
+    awaitCaptureEnd(recognition);
+    try{recognition.abort();}catch{}
     this.onEndCb('aborted');
   }
 
@@ -108,8 +127,9 @@ class BrowserStt implements SttProvider {
     this.onEndCb = cb;
   }
 
-  private cleanup(): void {
+  private cleanup(release=true): void {
     if (this.recognition) {
+      if(release&&activeCapture===this.recognition){activeCapture=null;captureReleasedAt=Date.now();}
       this.recognition.onresult = null;
       this.recognition.onerror = null;
       this.recognition.onend = null;
@@ -127,16 +147,28 @@ class BrowserTts implements TtsProvider {
   private generation = 0;
   private queue: string[] = [];
   private currentUtterance: SpeechSynthesisUtterance | null = null;
+  private speechWatchdog:number|undefined;
   private localSpeech: { controller: AbortController; audio: HTMLAudioElement | null; url: string | null } | null = null;
 
   speak(text: string): void {
     if (!this.supported || this.muted || !text.trim()) return;
-    this.queue.push(...splitSpokenText(prepareSpokenText(text)));
+    const chunks=splitSpokenText(prepareSpokenText(text));
+    if(!chunks.length){if(!this.currentUtterance&&!this.localSpeech)queueMicrotask(()=>this.onEndCb());return;}
+    this.queue.push(...chunks);
     this.speakNext();
+  }
+
+  activate():void {
+    if(!this.supported||!mobileDevice)return;
+    // Prime the native speech engine during the user's tap, before an async reply arrives.
+    try{speechSynthesis.resume?.();const prime=new SpeechSynthesisUtterance(' ');prime.volume=0;speechSynthesis.speak(prime);}catch{}
   }
 
   private speakNext(): void {
     if (this.currentUtterance || this.localSpeech || this.pendingSpeech !== undefined || this.muted) return;
+    if(mobileDevice&&(activeCapture||Date.now()-captureReleasedAt<250)){
+      this.pendingSpeech=window.setTimeout(()=>{this.pendingSpeech=undefined;this.speakNext();},150);return;
+    }
     const text = this.queue.shift();
     if (!text) return;
     const generation = this.generation;
@@ -191,27 +223,43 @@ class BrowserTts implements TtsProvider {
     this.currentUtterance = utterance;
     utterance.lang = 'es-AR';
     utterance.rate = 0.97;
+    utterance.volume=1;
     const voice = this.pickVoice();
-    if (voice) utterance.voice = voice;
+    if (voice) {utterance.voice = voice;utterance.lang=voice.lang;}
     const finish = () => {
       if (generation !== this.generation || this.currentUtterance !== utterance) return;
+      if(this.speechWatchdog!==undefined){clearTimeout(this.speechWatchdog);this.speechWatchdog=undefined;}
       this.currentUtterance = null;
       if (this.queue.length) this.speakNext();
       else this.onEndCb();
     };
     utterance.onend = finish;
-    utterance.onerror = finish;
+    const fail=()=>{
+      if(generation!==this.generation||this.currentUtterance!==utterance)return;
+      this.queue=[];finish();speechSynthesis.cancel();
+      voiceError('No pude reproducir la voz del teléfono. Tocá «Probar voz», revisá el volumen multimedia y después activá manos libres.');
+    };
+    utterance.onerror = fail;
+    utterance.onstart=()=>{
+      if(generation!==this.generation||this.currentUtterance!==utterance)return;
+      clearTimeout(this.speechWatchdog);
+      this.speechWatchdog=window.setTimeout(fail,Math.max(15000,text.length*160+10000));
+    };
     // Chrome: cancelar e inmediatamente hablar puede descartar la utterance.
-    this.pendingSpeech = window.setTimeout(() => {
-      this.pendingSpeech = undefined;
-      if (!this.muted && generation === this.generation) speechSynthesis.speak(utterance);
-    }, 50);
+    const play=()=>{
+      this.pendingSpeech=undefined;
+      if(this.muted||generation!==this.generation)return;
+      this.speechWatchdog=window.setTimeout(fail,8000);
+      try{speechSynthesis.resume?.();speechSynthesis.speak(utterance);}catch{fail();}
+    };
+    if(mobileDevice)play();else this.pendingSpeech=window.setTimeout(play,50);
   }
 
   cancel(): void {
     this.generation++;
     this.queue = [];
     this.currentUtterance = null;
+    if(this.speechWatchdog!==undefined){clearTimeout(this.speechWatchdog);this.speechWatchdog=undefined;}
     const local = this.localSpeech;
     this.localSpeech = null;
     if (local) { local.controller.abort(); if (local.audio) {local.audio.onended = null;local.audio.onerror = null;local.audio.pause();} if (local.url) URL.revokeObjectURL(local.url); }

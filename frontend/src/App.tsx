@@ -103,7 +103,11 @@ function App() {
     const pause=()=>{if(document.visibilityState!=='visible'){setHandsFree(false);setVoiceAwake(false);speech.abortListening();speech.cancelSpeaking();setVoiceNotice('Micrófono pausado al salir de la app. Activá manos libres para volver a escuchar.');}};
     document.addEventListener('visibilitychange',pause);return()=>document.removeEventListener('visibilitychange',pause);
   },[speech.abortListening,speech.cancelSpeaking]);
-  useReplyInterrupt({listener:interruptionListener,enabled:handsFree && (isLoading || speech.orbState==='SPEAKING'),onStop:()=>stopReplyRef.current(),isEcho:speech.isSpeechEcho});
+  useReplyInterrupt({listener:interruptionListener,enabled:!mobileDevice && handsFree && (isLoading || speech.orbState==='SPEAKING'),onStop:()=>stopReplyRef.current(),isEcho:speech.isSpeechEcho});
+  useEffect(()=>{
+    const failed=(event:Event)=>{setHandsFree(false);setVoiceAwake(false);speech.abortListening();setVoiceNotice((event as CustomEvent<string>).detail);};
+    window.addEventListener('jarvis-voice-error',failed);return()=>window.removeEventListener('jarvis-voice-error',failed);
+  },[speech.abortListening]);
 
   const pendingSpeechRef = useRef('');
   const speakingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -165,6 +169,7 @@ function App() {
     speech.cancelSpeaking();
     speech.setThinking();
     pendingSpeechRef.current = '';
+    if(mobileDevice)speech.activateAudio();
     const reply = await sendMessage(text, currentConversationId, handleStreamToken);
     if (reply && !replyInterruptedRef.current) {
       finishStreamSpeech();
@@ -248,6 +253,7 @@ function App() {
     speech.cancelSpeaking();
     speech.setThinking();
     pendingSpeechRef.current = '';
+    if(mobileDevice)speech.activateAudio();
     const reply = await sendMessage(text, currentConversationId, handleStreamToken);
     if (reply && !replyInterruptedRef.current) {
       finishStreamSpeech();
@@ -306,18 +312,23 @@ function App() {
         <div className="global-voice-controls">
           <span className="voice-engine">{naturalVoiceAvailable()?'Voz natural · Alex':'Voz del navegador'}</span>
           <div className="handsfree-controls">
+            {mobileDevice&&speech.ttsSupported&&<button type="button" className="handsfree-toggle" onClick={()=>{setVoiceNotice('');speech.abortListening();speech.cancelSpeaking();speech.activateAudio();speech.speak('Buenas, Federico. Esta es mi voz. ¿Me escuchás?',true);}}>Probar voz</button>}
             {(isLoading || speech.orbState==='SPEAKING') && <button type="button" className="stop-reply-button" onClick={()=>stopReplyRef.current()}>Detener respuesta</button>}
             <button type="button" className={handsFree ? 'handsfree-toggle handsfree-active' : 'handsfree-toggle'} aria-pressed={handsFree} disabled={!speech.sttSupported || !speech.ttsSupported} onClick={() => {
               setVoiceNotice('');
               setVoiceAwake(false);
               if (handsFree) { setHandsFree(false); speech.abortListening(); }
               else {
+                speech.activateAudio();
                 setHandsFree(true);
                 // Activar durante una respuesta debe esperar, no cancelar la voz.
-                if (!isLoading && !commandBusyRef.current && speech.orbState === 'IDLE') speech.startListening();
+                if (!isLoading && !commandBusyRef.current && speech.orbState === 'IDLE'){
+                  if(mobileDevice)speech.speak('Manos libres activado. Decí Jarvis para llamarme.',true);
+                  else speech.startListening();
+                }
               }
             }}>{handsFree ? 'Desactivar manos libres' : 'Activar manos libres'}</button>
-            <span role="status">{handsFree ? isLoading || speech.orbState === 'SPEAKING' ? 'Decí «gracias, Jarvis» para detener la respuesta' : voiceAwake ? 'Conversación activa · te escucho al terminar de hablar' : 'Decí «Jarvis» para llamarme' : !speech.sttSupported ? 'Reconocimiento de voz no disponible en este navegador' : 'Activá el micrófono una vez y después decí «Jarvis»'}</span>
+            <span role="status">{handsFree ? isLoading || speech.orbState === 'SPEAKING' ? mobileDevice?'Tocá «Detener respuesta» para cortar · al terminar vuelvo a escucharte':'Decí «gracias, Jarvis» para detener la respuesta' : voiceAwake ? 'Conversación activa · te escucho al terminar de hablar' : 'Decí «Jarvis» para llamarme' : !speech.sttSupported ? 'Reconocimiento de voz no disponible en este navegador' : 'Activá el micrófono una vez y después decí «Jarvis»'}</span>
           </div>
           {voiceNotice && <p className="voice-notice" role="alert">{voiceNotice}</p>}
         </div>
@@ -355,7 +366,7 @@ function App() {
           </section>
         <div className="composer-wrap">
           <form onSubmit={handleSendText} className="command-composer">
-            <MicButton listening={speech.orbState === 'LISTENING'} supported={speech.sttSupported} onStart={() => { setHandsFree(false); setVoiceAwake(false); speech.startListening(); }} onStop={speech.stopListening} />
+            <MicButton listening={speech.orbState === 'LISTENING'} supported={speech.sttSupported} onStart={() => { speech.activateAudio();setHandsFree(false); setVoiceAwake(false); speech.startListening(); }} onStop={speech.stopListening} />
             <textarea aria-label="Mensaje para Jarvis" rows={2} value={inputValue} onChange={(e) => setInput(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) { e.preventDefault(); e.currentTarget.form?.requestSubmit(); } }} placeholder={speech.orbState === 'LISTENING' ? 'Te escucho…' : 'Escribí tu próxima misión…'} />
             <button type="button" onClick={speech.toggleMute} aria-label={speech.isMuted ? 'Activar voz' : 'Silenciar voz'} title={speech.isMuted ? 'Activar voz' : 'Silenciar voz'} className="voice-toggle">{speech.isMuted ? <MutedIcon /> : <SpeakerIcon />}</button>
             <button type="submit" disabled={(isLoading && !isStopReplyCommand(input)) || !input.trim()} className="send-button" aria-label="Enviar mensaje">↗</button>

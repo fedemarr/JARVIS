@@ -22,6 +22,7 @@ export interface TtsVoice {
 export interface TtsProvider {
   readonly supported: boolean;
   speak(text: string): void;
+  activate?(): void;
   cancel(): void;
   isMuted(): boolean;
   setMuted(muted: boolean): void;

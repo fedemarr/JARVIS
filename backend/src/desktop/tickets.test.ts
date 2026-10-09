@@ -9,6 +9,7 @@ import { readTicketFile,writeTicketFile,listTicketFiles } from './ticketFiles';
 import { createBridgeToken,validBridgeToken } from '../security/bridge';
 import { TicketPublisher } from './ticketPublish';
 import { ticketIdentity } from './ticketIdentity';
+import {ticketContext,requirementsCheck} from './ticketRequirements';
 
 async function fixture() {
   const root=await fs.mkdtemp(path.join(os.tmpdir(),'jarvis-tickets-'));
@@ -146,15 +147,47 @@ test('ticket: una sola tarea, cancelación y proyectos no autorizados',async()=>
     await runner.cancel(job.id);assert.equal((await terminal(runner,job.id)).status,'cancelled');
   }finally{runner.close();await data.clean();}
 });
-test('ticket: adjunto grande se consulta en el proyecto sin inflar el prompt',async()=>{
+test('ticket: entrega el adjunto grande completo y exige cobertura del mockup',async()=>{
   const data=await fixture();const reference='jarvis-tickets/mockup.html';
   await fs.writeFile(path.join(data.project,'.gitignore'),'jarvis-tickets/\n');await fs.mkdir(path.join(data.project,'jarvis-tickets'));await fs.writeFile(path.join(data.project,reference),'<h1>Mockup</h1>'+'x'.repeat(80000));
   const runner=new TicketRunner(data.config,data.root,async(workspace,prompt)=>{
-    assert(prompt.includes(reference));assert(prompt.length<10000);assert((await readTicketFile(workspace,reference)).length>64000);
-    await writeTicketFile(workspace,'sum.js','export const sum=(a,b)=>a+b;');return 'Adjunto consultado.';
+    assert(prompt.includes(reference));assert(prompt.includes('x'.repeat(80000)));assert(prompt.includes('alcance COMPLETO'));assert((await readTicketFile(workspace,reference)).length>64000);
+    await writeTicketFile(workspace,'sum.js','export const sum=(a,b)=>a+b;');return 'Adjunto consultado.\n```json\n'+JSON.stringify({sources:[reference],criteria:[{source:reference,requirement:'Corregir la suma del mockup',status:'implemented',evidence:'sum.js: sum devuelve a+b'}]})+'\n```';
   });
   try{const job=await runner.start({project:'ohlimpiaerp',instruction:'Resolver el ticket con el mockup.',referencePaths:[reference]});assert.equal((await terminal(runner,job.id)).status,'ready');}
   finally{runner.close();await data.clean();}
+});
+
+test('ticket: entrega Markdown y HTML completos también al retomar; pendientes impiden publicar aunque los tests pasen',async()=>{
+  const data=await fixture();let attempts=0;
+  const references=['requirements.md','mockup.html'];
+  await fs.writeFile(path.join(data.project,references[0]),'# Requisitos\n'+'Detalle.\n'.repeat(9000)+'ULTIMO_REQUISITO');
+  await fs.writeFile(path.join(data.project,references[1]),'<h1>Bandeja</h1><button>Agregar</button>FINAL_MOCKUP');
+  const runner=new TicketRunner(data.config,data.root,async(workspace,prompt)=>{
+    attempts++;assert(prompt.includes('ULTIMO_REQUISITO'));assert(prompt.includes('FINAL_MOCKUP'));
+    assert(prompt.includes('La suma da un resultado incorrecto.'));
+    await writeTicketFile(workspace,'sum.js','export const sum=(a,b)=>a+b;');
+    return 'Entrega parcial.\n```json\n'+JSON.stringify({sources:['ticket.md',...references],criteria:[
+      {source:'ticket.md',requirement:'Corregir suma',status:'implemented',evidence:'sum.js: sum'},
+      {source:references[0],requirement:'Último requisito',status:'implemented',evidence:'sum.js: sum'},
+      {source:references[1],requirement:'Bandeja con Agregar',status:'pending',evidence:'Falta implementar la Bandeja'}
+    ]})+'\n```';
+  });
+  try{
+    const job=await runner.start({project:'ohlimpiaerp',instruction:'Resolver TODO el ticket.',ticketPath:'ticket.md',referencePaths:references});
+    const first=await terminal(runner,job.id);assert.equal(first.status,'failed');
+    assert(first.checks?.some(check=>check.name==='Pruebas unitarias'&&check.status==='passed'));
+    assert(first.checks?.some(check=>check.name.startsWith('Cobertura')&&check.status==='failed'&&check.output.includes('Bandeja')));
+    await assert.rejects(runner.publishPlan(job.id),/preparado/);
+    await runner.retry(job.id);assert.equal((await terminal(runner,job.id)).status,'failed');assert.equal(attempts,2);
+    const context=await ticketContext(data.project,'ticket.md',references);
+    assert.equal(context.documents.length,3);
+    assert.equal(requirementsCheck('Sin revisión estructurada.',context.documents).status,'failed');
+    assert.equal(requirementsCheck('```json\n'+JSON.stringify({sources:['ticket.md'],criteria:[{source:'ticket.md',requirement:'Solo suma',status:'implemented',evidence:'sum.js'}]})+'\n```',context.documents).status,'failed');
+    await fs.writeFile(path.join(data.project,'large.md'),'x'.repeat(512001));
+    await assert.rejects(runner.start({project:'ohlimpiaerp',instruction:'Resolver el archivo enorme.',referencePaths:['large.md']}),/contenido incompleto/);
+    assert.equal(attempts,2,'No inicia una resolución con contexto truncado');
+  }finally{runner.close();await data.clean();}
 });
 
 test('ticket: retomar conserva cambios parciales, pedido original y diff completo',async()=>{

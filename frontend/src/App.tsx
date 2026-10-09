@@ -371,7 +371,6 @@ function App() {
         <div className="chat-panel">
           <div className="chat-toolbar"><span className="eyebrow">CANAL DE COMUNICACIÓN</span><button type="button" aria-pressed={expandedChat} onClick={()=>setExpandedChat(value=>!value)}>{expandedChat?'Mostrar Jarvis':'Ampliar chat'}</button></div>
           <section ref={feedRef} className="conversation-feed" aria-label="Conversación" onScroll={event=>{const feed=event.currentTarget;followReplyRef.current=feed.scrollHeight-feed.clientHeight-feed.scrollTop<80;setReadingHistory(!followReplyRef.current);}}>
-            <div className="feed-heading"><span>{isLoading ? 'BUSCANDO Y PROCESANDO' : 'CHAT + VOZ'}</span></div>
             {messages.length === 0 && <div className="empty-transmission"><span>◈</span><h3>¿Cuál es la misión?</h3><p>Importá un ticket, compartí una idea o hablame.<br />Estoy listo para ayudarte a darle forma.</p></div>}
             {messages.map((msg: LlmMessage, index) => <ChatMessage key={index} message={msg} disabled={isLoading} onSpeak={text=>{setVoiceNotice('');speech.abortListening();speech.cancelSpeaking();speech.activateAudio();speech.speak(text,true);}} />)}
             {isLoading && <div className="processing" role="status"><span /><span /><span /> Analizando contexto y herramientas…</div>}

@@ -20,7 +20,7 @@ export const ToolCard: React.FC<{ card: ToolCardData }> = ({ card }) => {
       >
         <span className="flex items-center gap-2">
           <span className={`font-mono ${statusColor}`}>{statusIcon}</span>
-          <span className="font-mono text-cyan-200">{card.name}</span>
+          <span className="font-mono text-cyan-200">{({web_search:'Buscar en internet',read_web_page:'Leer página y JavaScript',get_weather:'Consultar clima'} as Record<string,string>)[card.name] || card.name}</span>
         </span>
         <span className="flex items-center gap-3 text-gray-400">
           {card.durationMs !== undefined && <span>{card.durationMs}ms</span>}

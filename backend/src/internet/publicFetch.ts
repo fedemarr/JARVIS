@@ -31,14 +31,14 @@ export async function publicFetch(input:string,limit=256000):Promise<Result> {
     const controller=new AbortController();
     const timer=setTimeout(()=>controller.abort(),Math.max(1,Math.min(10000,deadline-Date.now())));
     try {
-      const response=await fetch(url,{dispatcher:agent,redirect:'manual',signal:controller.signal});
+      const response=await fetch(url,{dispatcher:agent,redirect:'manual',signal:controller.signal,headers:{'User-Agent':'Mozilla/5.0 (compatible; JarvisReader/1.0)','Accept':'text/html,application/json,application/javascript,text/plain,*/*;q=0.5'}});
       const redirect=response.headers.get('location');
       if([301,302,303,307,308].includes(response.status) && redirect) {
         await response.body?.cancel();url=publicUrl(new URL(redirect,url).href);continue;
       }
       if(!response.ok) {await response.body?.cancel();throw new Error(`La fuente respondió HTTP ${response.status}.`);}
       const contentType=response.headers.get('content-type') || '';
-      if(!/text\/|json|xml/i.test(contentType)) {await response.body?.cancel();throw new Error('La fuente no es una página de texto.');}
+      if(!/text\/|json|xml|javascript/i.test(contentType)) {await response.body?.cancel();throw new Error('La fuente no es una página de texto.');}
       const reader=response.body?.getReader();if(!reader)throw new Error('La fuente no devolvió texto.');
       const chunks:Buffer[]=[];let bytes=0;let truncated=false;
       while(true) {

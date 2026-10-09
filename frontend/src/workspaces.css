@@ -26,6 +26,23 @@ html, body, #root { overflow: hidden; }
 .session-strip { padding: 2px 24px 22px; display: flex; flex-wrap: wrap; gap: 10px 20px; color: #7e9bbc; font-size: 10px; line-height: 1.6; }
 .session-strip i { display: inline-block; height: 5px; width: 5px; border-radius: 50%; background: #5bc8f6; margin-right: 6px; }
 .chat-panel { overflow: hidden; }
+.chat-toolbar { display:flex; align-items:center; justify-content:space-between; gap:10px; flex-shrink:0; padding:12px 18px; border-bottom:1px solid var(--line); }
+.chat-toolbar button,.follow-reply { border:1px solid #285372; border-radius:6px; padding:8px 12px; color:#a9e5ff; background:#0b2240; font-size:12px; }
+.follow-reply { align-self:center; flex-shrink:0; margin:6px; }
+.mission-workspace.chat-expanded { grid-template-columns:minmax(0,1fr); }
+.mission-workspace.chat-expanded > .main-scroll { display:none; }
+.chat-panel,.transmission-body { min-width:0; }
+.formatted-answer { white-space:normal; }
+.formatted-answer p { margin:0 0 12px; }
+.formatted-answer a { color:#79dfff; text-decoration:underline; text-underline-offset:3px; }
+.formatted-answer ul,.formatted-answer ol { padding-left:22px; margin:10px 0; }
+.formatted-answer ul { list-style:disc; }.formatted-answer ol { list-style:decimal; }
+.formatted-answer h1,.formatted-answer h2,.formatted-answer h3 { font-size:15px; color:#d4f3ff; margin:16px 0 8px; font-weight:600; }
+.formatted-answer pre { overflow:auto; max-width:100%; padding:12px; background:#04101e; border-radius:6px; }
+.formatted-answer code { font-family:Consolas,monospace; font-size:12px; white-space:pre-wrap; }
+.formatted-answer table { display:block; max-width:100%; overflow:auto; border-collapse:collapse; }
+.formatted-answer th,.formatted-answer td { padding:8px; border:1px solid #254c70; }
+.formatted-answer blockquote { border-left:3px solid #285372; padding-left:12px; }
 .chat-panel .conversation-feed { overscroll-behavior: contain; }
 .chat-panel .composer-wrap { padding: 14px 18px; }
 .feed-heading { letter-spacing: .8px; }

@@ -7,7 +7,7 @@ const server=http.createServer((req,res)=>{
   if(req.url==='/api/health')return res.end(JSON.stringify({provider:'Claude',model:'test'}));
   if(req.url==='/api/conversations')return res.end(JSON.stringify([{id:'mobile-test',title:'Plan de estudio'}]));
   if(req.url==='/api/conversations/mobile-test')return res.end(JSON.stringify({messages:[{role:'user',text:'Estudiar'}]}));
-  if(req.url==='/api/chat'){res.setHeader('Content-Type','text/event-stream');return res.end('event: token\ndata: {"text":"Respuesta de prueba móvil."}\n\nevent: done\ndata: {}\n\n');}
+  if(req.url==='/api/chat'){res.setHeader('Content-Type','text/event-stream');const text='Respuesta de prueba móvil.\n\n[Fuente primaria](https://example.org/informe)\n\n'+Array.from({length:35},(_,i)=>'Párrafo '+i+': información de la fuente para comprobar la lectura y el desplazamiento.').join('\n\n');return res.end('event: token\ndata: '+JSON.stringify({text})+'\n\nevent: done\ndata: {}\n\n');}
   return res.end('{}');
  }
  const name=req.url.split('?')[0],file=path.resolve(dist,'.'+(name==='/'?'/index.html':name));
@@ -28,6 +28,12 @@ const server=http.createServer((req,res)=>{
    await page.getByRole('button',{name:'Cerrar ventana',exact:true}).click();
    await page.getByRole('button',{name:'Conversaciones',exact:true}).click();await page.getByRole('dialog').getByRole('button',{name:'Plan de estudio',exact:true}).waitFor();await page.getByRole('button',{name:'Cerrar ventana',exact:true}).click();
    await chat.fill('Hola desde el celular');await page.getByRole('button',{name:'Enviar mensaje',exact:true}).click();await page.getByText('Respuesta de prueba móvil.',{exact:true}).waitFor();
+   const source=page.getByRole('link',{name:'Fuente primaria',exact:true});assert.equal(await source.getAttribute('href'),'https://example.org/informe');assert.equal(await source.getAttribute('rel'),'noopener noreferrer');
+   await page.getByRole('button',{name:'Ampliar chat',exact:true}).click();assert.equal(await page.locator('.main-scroll').isVisible(),false);
+   await page.locator('.conversation-feed').evaluate(feed=>{feed.scrollTop=0;feed.dispatchEvent(new Event('scroll'));});
+   await page.getByRole('button',{name:'Ir a la última respuesta ↓',exact:true}).click();
+   assert(await page.locator('.conversation-feed').evaluate(feed=>feed.scrollTop>0));
+   await page.getByRole('button',{name:'Mostrar Jarvis',exact:true}).click();
    await page.getByRole('button',{name:'Probar sonido',exact:true}).click();await page.getByRole('status').filter({hasText:/sonido de prueba/}).waitFor();
    for(const height of [844,500]){
     await page.setViewportSize({width:390,height});await chat.focus();await page.waitForTimeout(150);

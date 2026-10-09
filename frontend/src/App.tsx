@@ -25,6 +25,11 @@ function App() {
   const access = useAccess();
   const [input, setInput] = useState('');
   const [activeArea, setActiveArea] = useState<'communication' | 'tickets' | 'computer'>('communication');
+  const [expandedChat,setExpandedChat]=useState(false);
+  const [readingHistory,setReadingHistory]=useState(false);
+  const feedRef=useRef<HTMLElement>(null);
+  const followReplyRef=useRef(true);
+  const userCountRef=useRef(0);
   const localViewRef = useRef<HTMLElement>(null);
   useEffect(() => { localViewRef.current?.scrollTo({ top: 0 }); }, [activeArea]);
   const prepareMessage = (text:string) => { setInput(text); setActiveArea('communication'); };
@@ -183,10 +188,13 @@ function App() {
   };
 
   useEffect(() => {
-    const feed = messagesEndRef.current?.closest('.conversation-feed');
-    if (!messages.some((message) => message.role === 'user')) feed?.scrollTo({ top: 0 });
-    else messagesEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    const feed=feedRef.current;
+    const count=messages.filter(message=>message.role==='user').length;
+    if(count!==userCountRef.current){followReplyRef.current=true;setReadingHistory(false);userCountRef.current=count;}
+    if(!count)feed?.scrollTo({top:0});
+    else if(followReplyRef.current)feed?.scrollTo({top:feed.scrollHeight});
   }, [messages]);
+  useEffect(()=>{followReplyRef.current=true;setReadingHistory(false);userCountRef.current=0;},[currentConversationId]);
 
   useEffect(() => {
     if (!handsFree || isLoading || commandBusyRef.current) return;
@@ -337,7 +345,7 @@ function App() {
           {voiceNotice && <p className="voice-notice" role="alert">{voiceNotice}</p>}
           {mobileDevice&&audioStatus&&<p className="voice-notice" role="status">{audioStatus}</p>}
         </div>
-        <div className="mission-workspace" hidden={activeArea !== 'communication'}>
+        <div className={`mission-workspace ${expandedChat?'chat-expanded':''}`} hidden={activeArea !== 'communication'}>
         <div className="main-scroll">
           <section className="core-stage" aria-label="Estado del asistente">
             <div className="core-note"><span className="eyebrow">ASISTENTE PERSONAL</span><h2>Bienvenido,<br /><span>Federico.</span></h2><p>Una misión a la vez.<br />Construyamos lo que sigue.</p></div>
@@ -361,14 +369,16 @@ function App() {
           <div className="session-strip"><span><i /> {handsFree ? 'Manos libres activo' : 'Chat y voz disponibles'}</span><span>{providerModel || 'Conectando inteligencia…'}</span></div>
         </div>
         <div className="chat-panel">
-          <section className="conversation-feed" aria-label="Conversación">
-            <div className="feed-heading"><span className="eyebrow">CANAL DE COMUNICACIÓN</span><span>{isLoading ? 'PROCESANDO' : 'CHAT + VOZ'}</span></div>
+          <div className="chat-toolbar"><span className="eyebrow">CANAL DE COMUNICACIÓN</span><button type="button" aria-pressed={expandedChat} onClick={()=>setExpandedChat(value=>!value)}>{expandedChat?'Mostrar Jarvis':'Ampliar chat'}</button></div>
+          <section ref={feedRef} className="conversation-feed" aria-label="Conversación" onScroll={event=>{const feed=event.currentTarget;followReplyRef.current=feed.scrollHeight-feed.clientHeight-feed.scrollTop<80;setReadingHistory(!followReplyRef.current);}}>
+            <div className="feed-heading"><span>{isLoading ? 'BUSCANDO Y PROCESANDO' : 'CHAT + VOZ'}</span></div>
             {messages.length === 0 && <div className="empty-transmission"><span>◈</span><h3>¿Cuál es la misión?</h3><p>Importá un ticket, compartí una idea o hablame.<br />Estoy listo para ayudarte a darle forma.</p></div>}
             {messages.map((msg: LlmMessage, index) => <ChatMessage key={index} message={msg} disabled={isLoading} onSpeak={text=>{setVoiceNotice('');speech.abortListening();speech.cancelSpeaking();speech.activateAudio();speech.speak(text,true);}} />)}
             {isLoading && <div className="processing" role="status"><span /><span /><span /> Analizando contexto y herramientas…</div>}
             {toolCards.length > 0 && <div className="tool-feed">{toolCards.map((card) => <ToolCard key={card.id} card={card} />)}</div>}
             <div ref={messagesEndRef} />
           </section>
+        {readingHistory&&<button type="button" className="follow-reply" onClick={()=>{followReplyRef.current=true;setReadingHistory(false);feedRef.current?.scrollTo({top:feedRef.current.scrollHeight});}}>Ir a la última respuesta ↓</button>}
         <div className="composer-wrap">
           <form onSubmit={handleSendText} className="command-composer">
             <MicButton listening={speech.orbState === 'LISTENING'} supported={speech.sttSupported} onStart={() => { speech.activateAudio();setHandsFree(false); setVoiceAwake(false); speech.startListening(); }} onStop={speech.stopListening} />

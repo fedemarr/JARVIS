@@ -4,7 +4,7 @@
   "installCommand": "npm ci",
   "buildCommand": "npm run build -w frontend",
   "outputDirectory": "frontend/dist",
-  "functions": { "api/index.ts": { "maxDuration": 180 } },
+  "functions": { "api/index.ts": { "maxDuration": 180, "includeFiles": "node_modules/@sparticuz/chromium/bin/**" } },
   "headers": [
     { "source": "/sw.js", "headers": [{ "key": "Cache-Control", "value": "no-cache, no-store, must-revalidate" }] },
     { "source": "/manifest.webmanifest", "headers": [{ "key": "Content-Type", "value": "application/manifest+json" }, { "key": "Cache-Control", "value": "no-cache" }] }

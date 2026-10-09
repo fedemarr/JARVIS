@@ -4,6 +4,8 @@ import { publicAddress, publicFetch, publicUrl } from './publicFetch';
 import { parseSearch, relevantResults } from './tools';
 import { cloudTools } from '../cloud/tools';
 import { CloudStore } from '../cloud/store';
+import { renderPage } from './renderPage';
+import { pageText } from './pageText';
 
 test('internet: bloquear protocolos, puertos, credenciales e IPs privadas/reservadas',async()=>{
   for(const address of ['127.0.0.1','10.0.0.1','172.16.0.1','192.168.1.1','169.254.169.254','0.0.0.0','100.64.0.1','224.0.0.1','::1','::','fe80::1','fc00::1','::ffff:127.0.0.1','2001:db8::1'])assert.equal(publicAddress(address),false,address);
@@ -28,4 +30,34 @@ test('la nube expone internet sin habilitar herramientas de PC',async()=>{
   assert(!registry.get('browser'));assert(!registry.get('execute_command'));
   assert.equal((await registry.run('web_search',{query:'x'.repeat(301)})).ok,false);
   assert.equal((await registry.run('read_web_page',{url:'https://169.254.169.254/'})).ok,false);
+});
+
+test('Google: extraer enlaces directos y redirigidos sin incluir destinos privados',()=>{
+  const html='<a href="/url?q=https%3A%2F%2Fexample.org%2Fguide"><h3>Guía pública</h3></a><a href="https://example.com/docs"><h3>Documentación</h3></a><a href="https://127.0.0.1/"><h3>Privado</h3></a>';
+  assert.deepEqual(parseSearch(html,'google').map(r=>r.url),['https://example.org/guide','https://example.com/docs']);
+});
+
+test('lector: reconocer una app JavaScript, un captcha y conservar texto y enlaces de una fuente',()=>{
+  assert(pageText('<body><div id="root">Loading</div><script src="/bundle.js"></script></body>','https://example.com').needsJavaScript);
+  assert(pageText('<title>Just a moment</title><body>Verify you are human</body>','https://example.com').blocked);
+  const content=pageText('<main><h1>Informe</h1><p>Información importante</p><a href="/detalle">Más detalles</a><a href="http://127.0.0.1/">No seguir</a></main>','https://example.com');
+  assert(content.text.includes('Información importante'));
+  assert.deepEqual(content.links,[{title:'Más detalles',url:'https://example.com/detalle'}]);
+});
+
+test('navegador: ejecutar JavaScript y fetch público, bloquear recursos privados y escrituras',async()=>{
+  const fetched:string[]=[];
+  const html=`<title>Fuente dinámica</title><main id="root">Cargando</main><script src="/app.js"></script>`;
+  const js=`fetch('https://api.example.org/data').then(r=>r.json()).then(data=>{document.querySelector('main').textContent=data.text;});
+    fetch('https://127.0.0.1/private').catch(()=>{});
+    fetch('https://api.example.org/write',{method:'POST',body:'test'}).catch(()=>{});`;
+  const render=await renderPage('https://example.org/',{fetch:async url=>{
+    fetched.push(url);
+    return {url,body:url.endsWith('/app.js')?js:url.endsWith('/data')?JSON.stringify({text:'Este informe fue cargado con JavaScript y una API pública. '.repeat(10)}):html,contentType:url.endsWith('/app.js')?'application/javascript':url.endsWith('/data')?'application/json':'text/html',truncated:false};
+  }});
+  const content=pageText(render.body,render.url);
+  assert(content.text.includes('Este informe fue cargado con JavaScript'));
+  assert(fetched.includes('https://api.example.org/data'));
+  assert(!fetched.some(url=>url.includes('127.0.0.1')||url.endsWith('/write')));
+  assert(render.blockedResources>=2);
 });

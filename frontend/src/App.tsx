@@ -17,6 +17,8 @@ import { isStopReplyCommand } from './lib/voiceCommands';
 import { useReplyInterrupt } from './hooks/useReplyInterrupt';
 import { findSpokenBoundary } from './lib/spokenText';
 import { LlmMessage } from '../../shared/llm';
+import {MobileControls} from './components/MobileControls';
+import {mobileDevice} from './lib/mobile';
 
 function App() {
   const access = useAccess();
@@ -60,7 +62,7 @@ function App() {
   const localNoticeVoiceRef=useRef<(text:string)=>void>(()=>{});
   const routeTicket = (text:string) => {
     if(!parseTicketCommand(text))return false;
-    if(!desktopConnected()){addSystemMessage('Conectá esta PC para ejecutar tickets con Claude Code.');return true;}
+    if(!desktopConnected()){addSystemMessage(mobileDevice?'Para ejecutar este ticket en tu PC falta conectar el acceso remoto desde el celular. Podés analizar su contenido acá; la ejecución con Claude Code se hace en la computadora.':'Conectá esta PC para ejecutar tickets con Claude Code.');return true;}
     window.dispatchEvent(new CustomEvent('jarvis-run-ticket',{detail:text}));
     return true;
   };
@@ -96,6 +98,11 @@ function App() {
     },
   });
   localNoticeVoiceRef.current=(text)=>speech.speak(text);
+  useEffect(()=>{
+    if(!mobileDevice)return;
+    const pause=()=>{if(document.visibilityState!=='visible'){setHandsFree(false);setVoiceAwake(false);speech.abortListening();speech.cancelSpeaking();setVoiceNotice('Micrófono pausado al salir de la app. Activá manos libres para volver a escuchar.');}};
+    document.addEventListener('visibilitychange',pause);return()=>document.removeEventListener('visibilitychange',pause);
+  },[speech.abortListening,speech.cancelSpeaking]);
   useReplyInterrupt({listener:interruptionListener,enabled:handsFree && (isLoading || speech.orbState==='SPEAKING'),onStop:()=>stopReplyRef.current(),isEcho:speech.isSpeechEcho});
 
   const pendingSpeechRef = useRef('');
@@ -125,6 +132,7 @@ function App() {
   const handleStreamToken = useCallback(
     (delta: string) => {
       if(replyInterruptedRef.current)return;
+      if(mobileDevice&&document.visibilityState!=='visible')return;
       pendingSpeechRef.current += delta;
       const acc = pendingSpeechRef.current;
       const spokenUpTo = findSpokenBoundary(acc);
@@ -289,6 +297,7 @@ function App() {
           <div><span className="eyebrow">JARVIS / ESPACIO PERSONAL</span><h1>{activeArea === 'communication' ? 'Comunicación' : activeArea === 'tickets' ? 'Centro de tickets' : 'Tu computadora'}</h1></div>
           <div className="header-actions"><button type="button" className="refresh-app" onClick={()=>{const url=new URL(window.location.href);url.searchParams.set('refresh',String(Date.now()));window.location.replace(url.href);}}>Actualizar Jarvis</button><div className={`connection-chip connection-${backendStatus}`}><span />{backendStatus === 'connected' ? 'EN LÍNEA' : backendStatus === 'checking' ? 'CONECTANDO' : 'SIN CONEXIÓN'}</div></div>
         </header>
+        <MobileControls conversations={conversations} busy={isLoading} onNew={handleNewConversation} onSelect={id=>{setActiveArea('communication');selectConversation(id);}} />
         <nav className="workspace-navigation" aria-label="Sectores de Jarvis">
           <button type="button" aria-label="Comunicación" aria-pressed={activeArea === 'communication'} onClick={() => setActiveArea('communication')}><span className="area-icon">◉</span><span>Comunicación<small>Conversación y voz</small></span></button>
           <button type="button" aria-label="Tickets" aria-pressed={activeArea === 'tickets'} onClick={() => setActiveArea('tickets')}><span className="area-icon">⌘</span><span>Tickets<small>OhlimpiaERP y Claude Code</small></span></button>
@@ -351,7 +360,7 @@ function App() {
             <button type="button" onClick={speech.toggleMute} aria-label={speech.isMuted ? 'Activar voz' : 'Silenciar voz'} title={speech.isMuted ? 'Activar voz' : 'Silenciar voz'} className="voice-toggle">{speech.isMuted ? <MutedIcon /> : <SpeakerIcon />}</button>
             <button type="submit" disabled={(isLoading && !isStopReplyCommand(input)) || !input.trim()} className="send-button" aria-label="Enviar mensaje">↗</button>
           </form>
-          <div className="composer-footer"><span>ENTER para enviar · SHIFT + ENTER para nueva línea</span>
+          <div className="composer-footer"><span>{mobileDevice?'Escribí o tocá el micrófono para hablar':'ENTER para enviar · SHIFT + ENTER para nueva línea'}</span>
             {speech.ttsSupported && speech.voices.length > 0 && <select aria-label="Voz de Jarvis" value={speech.selectedVoice ?? ''} onChange={(e) => speech.changeVoice(e.target.value)}><option value="">Voz automática</option>{speech.voices.map((v) => <option key={v.voiceURI} value={v.voiceURI}>{v.name} ({v.lang})</option>)}</select>}
           </div>
         </div>

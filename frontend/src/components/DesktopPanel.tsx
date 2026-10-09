@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { desktopFetch, refreshDesktop } from '../lib/desktop';
 import { TicketAgentPanel } from './TicketAgentPanel';
+import {mobileDevice} from '../lib/mobile';
 
 type Project = {id:string;name:string};
 type FileEntry = {name:string;path:string;directory:boolean};
@@ -48,7 +49,7 @@ export function DesktopPanel({onImport,disabled,area}:{onImport:(text:string)=>v
     finally {setBusy(false);}
   }
   return <section className="desktop-panel"><span className="eyebrow">{area==='tickets'?'OHLIMPIAERP / DESARROLLO':'ESTA COMPUTADORA / PROYECTOS'}</span>
-    {!connected?<><p>Chat e internet disponibles. Conectá esta PC para sumar tus proyectos y la voz Alex en esta misma pantalla.</p><button type="button" onClick={()=>setAttempt((value)=>value+1)}>Conectar esta PC</button><p>El agente debe estar encendido. Si el navegador lo pide, permití el acceso a la red local.</p></>:<>
+    {!connected?mobileDevice?<div className="computer-content"><h2>{area==='tickets'?'Tickets desde el celular':'Tu PC desde el celular'}</h2><p>El chat, las consultas en internet y tus conversaciones están disponibles en este teléfono.</p><p>Para ejecutar tickets o leer los proyectos de tu computadora falta vincular el acceso remoto. El conector actual funciona cuando abrís Jarvis en esa PC.</p><button type="button" onClick={()=>onImport('Ayudame a analizar un ticket. Te voy a compartir su descripción y sus adjuntos.')}>Analizar un ticket en el chat</button></div>:<><p>Chat e internet disponibles. Conectá esta PC para sumar tus proyectos y la voz Alex en esta misma pantalla.</p><button type="button" onClick={()=>setAttempt((value)=>value+1)}>Conectar esta PC</button><p>El agente debe estar encendido. Si el navegador lo pide, permití el acceso a la red local.</p></>:<>
       <div hidden={area!=='computer'} className="computer-content">
       <h2>Archivos y proyectos</h2><p>Explorá tus carpetas y llevá contexto a la conversación.</p>
       <p>{natural?'Voz natural lista · Alex':voiceStarting?'Preparando voz natural · respaldo del navegador activo':'Voz del navegador activa · motor local no disponible'} · Exploración de archivos en solo lectura</p>

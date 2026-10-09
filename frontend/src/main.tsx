@@ -5,6 +5,10 @@ import { AccessGate } from './components/AccessGate'
 import './index.css'
 import './hud.css'
 import './workspaces.css'
+import './mobile.css'
+import {initializeMobile} from './lib/mobile'
+
+initializeMobile();
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode><AccessGate><App /></AccessGate></React.StrictMode>,

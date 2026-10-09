@@ -1,4 +1,5 @@
 import { apiFetch } from './api';
+import {mobileDevice} from './mobile';
 
 const local=['localhost','127.0.0.1'].includes(window.location.hostname) && window.location.port==='3002';
 let connected=local;
@@ -26,6 +27,7 @@ async function token() {
 export async function desktopFetch(url:string,init:RequestInit={}):Promise<Response> {
   if(!/^\/api\/(?:desktop\/(?:status|files|read|git)|voice\/(?:status|synthesize))(?:\?|$)/.test(url))throw new Error('Operación local no disponible.');
   if(local)return apiFetch(url,init);
+  if(mobileDevice)throw new Error('El control remoto de tu PC todavía no está conectado desde el celular.');
   const bearer=await token();
   const headers=new Headers(init.headers);headers.set('Authorization','Bearer '+bearer);
   const response=await fetch('http://127.0.0.1:3002'+url.replace('/api/','/api/bridge/'),{...init,headers,credentials:'omit',mode:'cors'});
@@ -35,6 +37,7 @@ export async function desktopFetch(url:string,init:RequestInit={}):Promise<Respo
 export async function ticketFetch(url:string,init:RequestInit={}):Promise<Response> {
   if(!/^\/api\/tickets(?:\/status|\/[a-f0-9-]{36}\/(?:cancel|open|retry|publish-plan|publish)|\/erp\/(?:status|list|connect|download|run)|\/migrations(?:\/(?:plan|execute))?)?$/.test(url))throw new Error('Operación de tickets no disponible.');
   if(local)return apiFetch(url,init);
+  if(mobileDevice)throw new Error('Los tickets se ejecutan en tu PC. Falta conectar el acceso remoto desde el celular.');
   if(!ticketCredential || ticketCredential.until<=Date.now()) {
     issuingTicket ??= (async()=>{
       const response=await apiFetch('/api/desktop/ticket-session',{method:'POST',signal:AbortSignal.timeout(12000)});

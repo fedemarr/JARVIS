@@ -128,7 +128,7 @@ API simulada y guarda capturas de escritorio y móvil en `artifacts/`.
 | La app no abre / dice "Failed to fetch" | Backend caído | `npm run dev` y ver `http://localhost:3001/api/health` |
 | No responde en chat | Falta `GEMINI_API_KEY` o `AI_MODEL` inválido | Revisar `.env`, correr `npm run llm:test` |
 | No habla por voz | Voz no seleccionada o mute activo | Elegir voz en el dropdown, desactivar mute, recargar (Ctrl+F5) |
-| `web_search` falla | Falta `SEARCH_API_KEY` | Poner una key de Tavily o Brave en `.env` |
+| `web_search` falla | Buscadores bloqueados o sin resultados pertinentes | Reformular la consulta o proporcionar una URL pública; no requiere `SEARCH_API_KEY` |
 | Error al ejecutar workflows n8n | n8n apagado, key mal, o workflow inactivo | `cd n8n && docker compose up -d`, chequear `npm run n8n:test` |
 | `browser` falla con error de Playwright | Navegador Chromium no descargado | En `backend/`: `npx playwright install chromium` |
 | `JARVIS_BASE_URL` falla desde n8n | Backend no alcanzable desde el contenedor | Ver `n8n/README.md` (usar `host.docker.internal`) |

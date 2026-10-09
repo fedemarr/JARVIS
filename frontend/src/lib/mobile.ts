@@ -1,4 +1,5 @@
-export const mobileDevice=/Android|iPhone|iPad|iPod/i.test(navigator.userAgent)||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1);
+export const iosDevice=/iPhone|iPad|iPod/i.test(navigator.userAgent)||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1);
+export const mobileDevice=/Android/i.test(navigator.userAgent)||iosDevice;
 export const installedApp=()=>window.matchMedia('(display-mode: standalone)').matches||(navigator as Navigator&{standalone?:boolean}).standalone===true;
 type InstallEvent=Event&{prompt:()=>Promise<void>;userChoice:Promise<{outcome:string}>};
 let installEvent:InstallEvent|undefined;
@@ -16,8 +17,9 @@ export function initializeMobile(){
     const height=window.visualViewport?.height||window.innerHeight;
     document.documentElement.style.setProperty('--jarvis-viewport-height',height+'px');
     const typing=document.activeElement?.matches('input,textarea');
-    if(!typing)fullHeight=height;
+    if(!typing)fullHeight=Math.max(fullHeight,height);
     document.documentElement.toggleAttribute('data-mobile-keyboard',mobileDevice&&!!typing&&height<fullHeight*.8);
   };
   window.visualViewport?.addEventListener('resize',resize);window.addEventListener('resize',resize);document.addEventListener('focusin',resize);document.addEventListener('focusout',resize);resize();
+  window.addEventListener('orientationchange',()=>{fullHeight=window.innerHeight;resize();});
 }

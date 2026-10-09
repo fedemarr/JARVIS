@@ -1,6 +1,6 @@
 import { LlmMessage } from '../../../shared/llm';
 
-export function ChatMessage({ message }: { message: LlmMessage }) {
+export function ChatMessage({ message,onSpeak,disabled }: { message: LlmMessage;onSpeak?:(text:string)=>void;disabled?:boolean }) {
   if (message.role === 'tool' || !message.text) return null;
   const isUser = message.role === 'user';
   return (
@@ -9,6 +9,7 @@ export function ChatMessage({ message }: { message: LlmMessage }) {
       <div className="transmission-body">
         <div className="transmission-label">{isUser ? 'FEDERICO' : 'JARVIS'}<span>{isUser ? 'INSTRUCCIÓN' : 'RESPUESTA'}</span></div>
         <div className="transmission-text">{message.text}</div>
+        {message.role==='assistant'&&onSpeak&&<button type="button" className="listen-answer" disabled={disabled} onClick={()=>onSpeak(message.text!)}>Escuchar respuesta</button>}
       </div>
     </article>
   );

@@ -19,16 +19,19 @@ const server=http.createServer((req,res)=>{
   for(const device of ['Pixel 7','iPhone 13']){
    const context=await browser.newContext({...devices[device],reducedMotion:'reduce'}),page=await context.newPage(),errors=[];page.on('pageerror',e=>errors.push(e.message));
    await page.addInitScript(()=>{
-    const state=window.voiceTest={owner:null,starts:0,conflicts:0,spoken:[],unlocked:false,failSound:false,missingEnd:false,neverStart:false,failPermission:false};
+    const ios=/iPhone/.test(navigator.userAgent),session={type:'auto'};
+    Object.defineProperty(navigator,'audioSession',{value:session});
+    const state=window.voiceTest={owner:null,starts:0,conflicts:0,spoken:[],blankUtterances:0,idleCancels:0,unlocked:false,failSound:false,missingEnd:false,neverStart:false,failPermission:false};
     window.webkitSpeechRecognition=class{
-     start(){if(state.owner){state.conflicts++;throw new DOMException('Microphone already running','InvalidStateError');}state.owner=this;state.starts++;if(state.failPermission){setTimeout(()=>{this.onerror?.({error:'not-allowed'});this.abort();},10);}}
+     start(){if(ios&&session.type!=='play-and-record')throw new Error('Wrong recording audio session');if(state.owner){state.conflicts++;throw new DOMException('Microphone already running','InvalidStateError');}state.owner=this;state.starts++;if(state.failPermission){setTimeout(()=>{this.onerror?.({error:'not-allowed'});this.abort();},10);}}
      stop(){this.abort();}
      abort(){const instance=this;setTimeout(()=>{if(state.owner===instance)state.owner=null;instance.onend?.();},80);}
     };
     window.feedVoice=text=>{const instance=state.owner;if(!instance)throw new Error('No microphone');instance.onresult?.({resultIndex:0,results:[{isFinal:true,0:{transcript:text}}]});};
-    Object.defineProperty(window,'speechSynthesis',{value:{getVoices:()=>[],addEventListener(){},removeEventListener(){},cancel(){},resume(){},speak(utterance){
+    Object.defineProperty(window,'speechSynthesis',{value:{getVoices:()=>[],addEventListener(){},removeEventListener(){},cancel(){state.idleCancels++;},resume(){},speak(utterance){
      if(navigator.userActivation.isActive)state.unlocked=true;
-     if(!utterance.text.trim())return;
+     if(!utterance.text.trim()){state.blankUtterances++;return;}
+     if(ios&&session.type!=='playback')throw new Error('Wrong playback audio session');
      if(!state.unlocked||state.failSound){setTimeout(()=>utterance.onerror?.({error:'not-allowed'}),10);return;}
      if(state.owner){state.conflicts++;setTimeout(()=>utterance.onerror?.({error:'audio-busy'}),10);return;}
      if(state.neverStart)return;
@@ -45,7 +48,9 @@ const server=http.createServer((req,res)=>{
    await page.waitForFunction(()=>!!window.voiceTest.owner);
    let state=await page.evaluate(()=>({starts:voiceTest.starts,conflicts:voiceTest.conflicts,spoken:voiceTest.spoken}));assert.equal(state.conflicts,0);assert(state.starts>=5);assert.equal(state.spoken.filter(text=>text.includes('respuesta hablada completa')).length,4);
    await page.getByRole('button',{name:'Desactivar manos libres',exact:true}).click();await page.waitForFunction(()=>!window.voiceTest.owner);
-   await page.evaluate(()=>window.voiceTest.failSound=true);await page.getByRole('button',{name:'Probar voz',exact:true}).click();await page.getByRole('alert').filter({hasText:'No pude reproducir la voz'}).waitFor();assert(await enable.isVisible());
+   if(device==='iPhone 13'){assert.equal(await page.evaluate(()=>voiceTest.blankUtterances),0);assert.equal(await page.evaluate(()=>voiceTest.idleCancels),0);}
+   await page.getByRole('button',{name:'Escuchar respuesta',exact:true}).last().click();await page.waitForFunction(()=>voiceTest.spoken.filter(text=>text.includes('respuesta hablada completa')).length===5);await page.waitForTimeout(100);
+   await page.evaluate(()=>window.voiceTest.failSound=true);await page.getByRole('button',{name:'Probar voz',exact:true}).click();await page.getByRole('alert').filter({hasText:'El navegador bloqueó la voz'}).waitFor();assert(await enable.isVisible());
    await page.evaluate(()=>{window.voiceTest.failSound=false;});await page.getByRole('button',{name:'Probar voz',exact:true}).click();await page.waitForFunction(()=>window.voiceTest.spoken.some(text=>text.includes('Esta es mi voz')));
    await page.waitForTimeout(100);await enable.click();await page.waitForFunction(()=>!!window.voiceTest.owner);await page.getByRole('button',{name:'Desactivar manos libres',exact:true}).click();await page.waitForFunction(()=>!window.voiceTest.owner);
    if(device==='Pixel 7'){

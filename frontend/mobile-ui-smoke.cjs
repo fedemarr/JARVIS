@@ -12,7 +12,7 @@ const server=http.createServer((req,res)=>{
  }
  const name=req.url.split('?')[0],file=path.resolve(dist,'.'+(name==='/'?'/index.html':name));
  if(!file.startsWith(dist+path.sep)||!fs.existsSync(file)){res.statusCode=404;return res.end();}
- res.setHeader('Content-Type',{'.html':'text/html','.js':'text/javascript','.css':'text/css','.png':'image/png','.svg':'image/svg+xml','.webmanifest':'application/manifest+json'}[path.extname(file)]||'text/plain');res.end(fs.readFileSync(file));
+ res.setHeader('Content-Type',{'.html':'text/html','.js':'text/javascript','.css':'text/css','.png':'image/png','.svg':'image/svg+xml','.wav':'audio/wav','.webmanifest':'application/manifest+json'}[path.extname(file)]||'text/plain');res.end(fs.readFileSync(file));
 });
 (async()=>{
  await new Promise(r=>server.listen(0,'127.0.0.1',r));const browser=await chromium.launch();
@@ -28,6 +28,7 @@ const server=http.createServer((req,res)=>{
    await page.getByRole('button',{name:'Cerrar ventana',exact:true}).click();
    await page.getByRole('button',{name:'Conversaciones',exact:true}).click();await page.getByRole('dialog').getByRole('button',{name:'Plan de estudio',exact:true}).waitFor();await page.getByRole('button',{name:'Cerrar ventana',exact:true}).click();
    await chat.fill('Hola desde el celular');await page.getByRole('button',{name:'Enviar mensaje',exact:true}).click();await page.getByText('Respuesta de prueba móvil.',{exact:true}).waitFor();
+   await page.getByRole('button',{name:'Probar sonido',exact:true}).click();await page.getByRole('status').filter({hasText:/sonido de prueba/}).waitFor();
    for(const height of [844,500]){
     await page.setViewportSize({width:390,height});await chat.focus();await page.waitForTimeout(150);
     const composer=await page.locator('.command-composer').boundingBox();assert(composer.y>=0&&composer.y+composer.height<=height,'El compositor sigue visible con teclado');

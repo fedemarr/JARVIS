@@ -1,4 +1,5 @@
 .mobile-controls{display:none}
+.listen-answer{margin-top:12px;min-height:44px;padding:9px 13px;border:1px solid #285372;border-radius:8px;background:#0b2240;color:#b5e7ff;font:12px system-ui}
 .mobile-dialog{color:#ceeaff;background:#07182f;border:1px solid #3d7092;border-radius:16px;width:min(420px,calc(100vw - 40px));max-height:75dvh;padding:22px;overflow:auto}
 .mobile-dialog::backdrop{background:#020813cc}
 .mobile-dialog p{line-height:1.65;color:#aac1da;font:14px system-ui}

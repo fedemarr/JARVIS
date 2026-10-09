@@ -1,13 +1,14 @@
 import { SttProvider, TtsProvider, SttEndReason, TtsVoice } from '../../../shared/voice';
 import { desktopFetch, desktopConnected, naturalVoiceAvailable } from './desktop';
 import { prepareSpokenText, splitSpokenText } from './spokenText';
-import {mobileDevice} from './mobile';
+import {mobileDevice,iosDevice} from './mobile';
+import {audioSessionMode,voicePlayback} from './audioSession';
 
 let activeCapture:SpeechRecognition|null=null;
 let captureReleasedAt=0;
 const voiceError=(message:string)=>window.dispatchEvent(new CustomEvent('jarvis-voice-error',{detail:message}));
 function awaitCaptureEnd(recognition:SpeechRecognition){
-  const release=()=>{clearTimeout(timer);recognition.onend=null;if(activeCapture===recognition){activeCapture=null;captureReleasedAt=Date.now();}};
+  const release=()=>{clearTimeout(timer);recognition.onend=null;if(activeCapture===recognition){activeCapture=null;captureReleasedAt=Date.now();if(iosDevice)audioSessionMode('playback');}};
   const timer=window.setTimeout(release,2500);
   recognition.onend=release;
 }
@@ -89,6 +90,7 @@ class BrowserStt implements SttProvider {
     this.recognition = recognition;
     activeCapture=recognition;
     try {
+      if(iosDevice)audioSessionMode('play-and-record');
       recognition.start();
     } catch {
       this.cleanup();
@@ -129,7 +131,7 @@ class BrowserStt implements SttProvider {
 
   private cleanup(release=true): void {
     if (this.recognition) {
-      if(release&&activeCapture===this.recognition){activeCapture=null;captureReleasedAt=Date.now();}
+      if(release&&activeCapture===this.recognition){activeCapture=null;captureReleasedAt=Date.now();if(iosDevice)audioSessionMode('playback');}
       this.recognition.onresult = null;
       this.recognition.onerror = null;
       this.recognition.onend = null;
@@ -161,7 +163,8 @@ class BrowserTts implements TtsProvider {
   activate():void {
     if(!this.supported||!mobileDevice)return;
     // Prime the native speech engine during the user's tap, before an async reply arrives.
-    try{speechSynthesis.resume?.();const prime=new SpeechSynthesisUtterance(' ');prime.volume=0;speechSynthesis.speak(prime);}catch{}
+    // A silent utterance can block WebKit's queue. The first iOS utterance must be real speech.
+    try{if(iosDevice){audioSessionMode('playback');speechSynthesis.resume?.();return;}speechSynthesis.resume?.();const prime=new SpeechSynthesisUtterance(' ');prime.volume=0;speechSynthesis.speak(prime);}catch{}
   }
 
   private speakNext(): void {
@@ -221,7 +224,7 @@ class BrowserTts implements TtsProvider {
   private speakBrowser(text: string, generation: number): void {
     const utterance = new SpeechSynthesisUtterance(text);
     this.currentUtterance = utterance;
-    utterance.lang = 'es-AR';
+    utterance.lang = iosDevice?'es-ES':'es-AR';
     utterance.rate = 0.97;
     utterance.volume=1;
     const voice = this.pickVoice();
@@ -231,17 +234,19 @@ class BrowserTts implements TtsProvider {
       if(this.speechWatchdog!==undefined){clearTimeout(this.speechWatchdog);this.speechWatchdog=undefined;}
       this.currentUtterance = null;
       if (this.queue.length) this.speakNext();
-      else this.onEndCb();
+      else {voicePlayback('La reproducción de voz terminó.');this.onEndCb();}
     };
     utterance.onend = finish;
-    const fail=()=>{
+    const fail=(reason='timeout')=>{
       if(generation!==this.generation||this.currentUtterance!==utterance)return;
       this.queue=[];finish();speechSynthesis.cancel();
-      voiceError('No pude reproducir la voz del teléfono. Tocá «Probar voz», revisá el volumen multimedia y después activá manos libres.');
+      voicePlayback('La voz no pudo iniciarse: '+reason+'.');
+      voiceError(reason==='not-allowed'?'El navegador bloqueó la voz. Tocá «Escuchar respuesta» para reproducirla desde tu toque.':'No pude reproducir la voz del teléfono. Tocá «Probar sonido» y después «Probar voz» para comprobar la salida de audio.');
     };
-    utterance.onerror = fail;
+    utterance.onerror = event=>fail(event.error);
     utterance.onstart=()=>{
       if(generation!==this.generation||this.currentUtterance!==utterance)return;
+      voicePlayback('El navegador inició la voz'+(voice?' · '+voice.name:'')+'.');
       clearTimeout(this.speechWatchdog);
       this.speechWatchdog=window.setTimeout(fail,Math.max(15000,text.length*160+10000));
     };
@@ -250,12 +255,13 @@ class BrowserTts implements TtsProvider {
       this.pendingSpeech=undefined;
       if(this.muted||generation!==this.generation)return;
       this.speechWatchdog=window.setTimeout(fail,8000);
-      try{speechSynthesis.resume?.();speechSynthesis.speak(utterance);}catch{fail();}
+      try{if(iosDevice)audioSessionMode('playback');voicePlayback('Preparando la voz…');speechSynthesis.resume?.();speechSynthesis.speak(utterance);}catch{fail('exception');}
     };
     if(mobileDevice)play();else this.pendingSpeech=window.setTimeout(play,50);
   }
 
   cancel(): void {
+    const hadSpeech=!!this.currentUtterance||!!this.localSpeech||this.pendingSpeech!==undefined;
     this.generation++;
     this.queue = [];
     this.currentUtterance = null;
@@ -264,7 +270,7 @@ class BrowserTts implements TtsProvider {
     this.localSpeech = null;
     if (local) { local.controller.abort(); if (local.audio) {local.audio.onended = null;local.audio.onerror = null;local.audio.pause();} if (local.url) URL.revokeObjectURL(local.url); }
     if (this.pendingSpeech !== undefined) { clearTimeout(this.pendingSpeech); this.pendingSpeech = undefined; }
-    if (this.supported) {
+    if (this.supported && (!iosDevice||hadSpeech||speechSynthesis.speaking||speechSynthesis.pending)) {
       speechSynthesis.cancel();
     }
   }

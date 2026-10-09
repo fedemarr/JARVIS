@@ -19,6 +19,7 @@ import { findSpokenBoundary } from './lib/spokenText';
 import { LlmMessage } from '../../shared/llm';
 import {MobileControls} from './components/MobileControls';
 import {mobileDevice} from './lib/mobile';
+import {playTestTone} from './lib/audioSession';
 
 function App() {
   const access = useAccess();
@@ -40,6 +41,7 @@ function App() {
   }, [handsFree]);
   const [voiceAwake, setVoiceAwake] = useState(false);
   const [voiceNotice, setVoiceNotice] = useState('');
+  const [audioStatus,setAudioStatus]=useState('');
   const [backendStatus, setBackendStatus] = useState<'checking' | 'connected' | 'offline'>('checking');
   const [providerModel, setProviderModel] = useState('');
   const {
@@ -108,6 +110,7 @@ function App() {
     const failed=(event:Event)=>{setHandsFree(false);setVoiceAwake(false);speech.abortListening();setVoiceNotice((event as CustomEvent<string>).detail);};
     window.addEventListener('jarvis-voice-error',failed);return()=>window.removeEventListener('jarvis-voice-error',failed);
   },[speech.abortListening]);
+  useEffect(()=>{const update=(event:Event)=>setAudioStatus((event as CustomEvent<string>).detail);window.addEventListener('jarvis-voice-playback',update);return()=>window.removeEventListener('jarvis-voice-playback',update);},[]);
 
   const pendingSpeechRef = useRef('');
   const speakingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -313,6 +316,7 @@ function App() {
           <span className="voice-engine">{naturalVoiceAvailable()?'Voz natural · Alex':'Voz del navegador'}</span>
           <div className="handsfree-controls">
             {mobileDevice&&speech.ttsSupported&&<button type="button" className="handsfree-toggle" onClick={()=>{setVoiceNotice('');speech.abortListening();speech.cancelSpeaking();speech.activateAudio();speech.speak('Buenas, Federico. Esta es mi voz. ¿Me escuchás?',true);}}>Probar voz</button>}
+            {mobileDevice&&<button type="button" className="handsfree-toggle" onClick={()=>{setHandsFree(false);setVoiceAwake(false);speech.abortListening();speech.cancelSpeaking();playTestTone();}}>Probar sonido</button>}
             {(isLoading || speech.orbState==='SPEAKING') && <button type="button" className="stop-reply-button" onClick={()=>stopReplyRef.current()}>Detener respuesta</button>}
             <button type="button" className={handsFree ? 'handsfree-toggle handsfree-active' : 'handsfree-toggle'} aria-pressed={handsFree} disabled={!speech.sttSupported || !speech.ttsSupported} onClick={() => {
               setVoiceNotice('');
@@ -331,6 +335,7 @@ function App() {
             <span role="status">{handsFree ? isLoading || speech.orbState === 'SPEAKING' ? mobileDevice?'Tocá «Detener respuesta» para cortar · al terminar vuelvo a escucharte':'Decí «gracias, Jarvis» para detener la respuesta' : voiceAwake ? 'Conversación activa · te escucho al terminar de hablar' : 'Decí «Jarvis» para llamarme' : !speech.sttSupported ? 'Reconocimiento de voz no disponible en este navegador' : 'Activá el micrófono una vez y después decí «Jarvis»'}</span>
           </div>
           {voiceNotice && <p className="voice-notice" role="alert">{voiceNotice}</p>}
+          {mobileDevice&&audioStatus&&<p className="voice-notice" role="status">{audioStatus}</p>}
         </div>
         <div className="mission-workspace" hidden={activeArea !== 'communication'}>
         <div className="main-scroll">
@@ -359,7 +364,7 @@ function App() {
           <section className="conversation-feed" aria-label="Conversación">
             <div className="feed-heading"><span className="eyebrow">CANAL DE COMUNICACIÓN</span><span>{isLoading ? 'PROCESANDO' : 'CHAT + VOZ'}</span></div>
             {messages.length === 0 && <div className="empty-transmission"><span>◈</span><h3>¿Cuál es la misión?</h3><p>Importá un ticket, compartí una idea o hablame.<br />Estoy listo para ayudarte a darle forma.</p></div>}
-            {messages.map((msg: LlmMessage, index) => <ChatMessage key={index} message={msg} />)}
+            {messages.map((msg: LlmMessage, index) => <ChatMessage key={index} message={msg} disabled={isLoading} onSpeak={text=>{setVoiceNotice('');speech.abortListening();speech.cancelSpeaking();speech.activateAudio();speech.speak(text,true);}} />)}
             {isLoading && <div className="processing" role="status"><span /><span /><span /> Analizando contexto y herramientas…</div>}
             {toolCards.length > 0 && <div className="tool-feed">{toolCards.map((card) => <ToolCard key={card.id} card={card} />)}</div>}
             <div ref={messagesEndRef} />

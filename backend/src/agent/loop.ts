@@ -3,6 +3,7 @@ import { LlmProvider, LlmMessage, LlmToolCall, LlmToolResult } from '../../../sh
 import { ToolRegistry } from '../tools';
 import { redactArgs, summarize } from '../security/redact';
 import type { ToolLog } from '../memory/repositories/toolLogRepository';
+import { webSourceLinks } from '../internet/sourceLinks';
 
 const MAX_ITERATIONS = 8;
 const PENDING_TIMEOUT_MS = 5 * 60 * 1000;
@@ -89,7 +90,8 @@ export async function runAgentTurn(opts: {
     }
 
     if (calls.length === 0) {
-      const text = turnText.trim();
+      let text = turnText.trim();
+      if(text){const sourceLinks=webSourceLinks(added,text);if(sourceLinks){text+=sourceLinks;emit('token',{text:sourceLinks});}}
       if (text) {
         const msg: LlmMessage = { role: 'assistant', text };
         added.push(msg);

@@ -7,7 +7,11 @@ export function pageText(body:string,url:string,contentType='text/html') {
   const title=$('title').first().text().trim().slice(0,200);
   const hasScripts=$('script[src],script[type=module]').length>0;
   const appShell=$('#root,#app,#__next').length>0;
+  const emptyTables=$('table tbody').toArray().some(table=>$(table).find('tr').length===0);
+  const publishedAt=$('meta[property="article:published_time"],meta[name="date"],meta[itemprop="datePublished"]').first().attr('content') || $('time[datetime]').first().attr('datetime') || null;
+  const updatedAt=$('meta[property="article:modified_time"],meta[itemprop="dateModified"]').first().attr('content') || null;
   $('script,style,noscript,iframe,svg,form,nav,footer,header').remove();
+  $('th,td').append(' | ');
   $('p,li,h1,h2,h3,h4,br,tr,section,div').append('\n');
   const main=$('main,article,[role=main]').first();
   const selected=main.length?main:$('body');
@@ -20,6 +24,6 @@ export function pageText(body:string,url:string,contentType='text/html') {
     } catch {/* Nonpublic destinations cannot be followed. */}
   });
   const blocked=/captcha|verify (?:you are|that you)|checking your browser|access denied|just a moment|verifica.*humano|unusual traffic/i.test(title+' '+text.slice(0,1200)) && text.length<2500;
-  const needsJavaScript=hasScripts && (text.length<500 || appShell && text.length<2000) || /enable javascript|habilit[aá].*javascript|javascript.*(?:required|necesario)/i.test(text);
-  return {title,text,links,needsJavaScript,blocked};
+  const needsJavaScript=hasScripts && (text.length<500 || appShell && text.length<2000 || emptyTables) || /enable javascript|habilit[aá].*javascript|javascript.*(?:required|necesario)/i.test(text);
+  return {title,text,links,needsJavaScript,blocked,publishedAt,updatedAt};
 }
